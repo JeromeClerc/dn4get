@@ -83,14 +83,72 @@ export const PRIORITY_CONFIG: Record<
   },
 };
 
-export const DEFAULT_INSTANCES = [
-  { code: 'test', name: 'Test', color: '#6366f1' },
-  { code: 'integration', name: 'Intégration', color: '#3b82f6' },
-  { code: 'dev', name: 'Dev', color: '#06b6d4' },
-  { code: 'form', name: 'Form', color: '#10b981' },
-  { code: 'pre-prod', name: 'Pré-prod', color: '#f59e0b' },
-  { code: 'prod', name: 'Prod', color: '#ef4444' },
+export interface InstanceDefinition {
+  code: string;
+  name: string;
+  color: string;
+  order_index: number;
+}
+
+export const INSTANCE_DEFINITIONS: InstanceDefinition[] = [
+  { code: 'DEV', name: 'DEV', color: '#0284c7', order_index: 1 },
+  { code: 'TEST', name: 'TEST', color: '#6366f1', order_index: 2 },
+  { code: 'QA', name: 'QA', color: '#0d9488', order_index: 3 },
+  { code: 'INT', name: 'INT', color: '#2563eb', order_index: 4 },
+  { code: 'REC', name: 'REC', color: '#9333ea', order_index: 5 },
+  { code: 'FORM', name: 'FORM', color: '#16a34a', order_index: 6 },
+  { code: 'EQNX', name: 'EQNX', color: '#ea580c', order_index: 7 },
+  { code: 'PPROD', name: 'PPROD', color: '#d97706', order_index: 8 },
+  { code: 'PROD', name: 'PROD', color: '#e11d48', order_index: 9 },
 ];
+
+export const CODE_MAP: Record<string, string> = {
+  dev: 'DEV',
+  developpement: 'DEV',
+  DEV: 'DEV',
+  test: 'TEST',
+  TEST: 'TEST',
+  qa: 'QA',
+  qualite: 'QA',
+  QA: 'QA',
+  integration: 'INT',
+  int: 'INT',
+  INT: 'INT',
+  recette: 'REC',
+  rec: 'REC',
+  REC: 'REC',
+  form: 'FORM',
+  formation: 'FORM',
+  FORM: 'FORM',
+  equinoxe: 'EQNX',
+  eqnx: 'EQNX',
+  EQNX: 'EQNX',
+  'pre-prod': 'PPROD',
+  pprod: 'PPROD',
+  PPROD: 'PPROD',
+  prod: 'PROD',
+  PROD: 'PROD',
+};
+
+export function normalizeInstanceCode(raw: string): string {
+  if (!raw) return '';
+  const clean = raw.trim();
+  return CODE_MAP[clean.toLowerCase()] || CODE_MAP[clean] || clean.toUpperCase();
+}
+
+export function getInstanceInfo(rawCodeOrName: string): InstanceDefinition {
+  const normalized = normalizeInstanceCode(rawCodeOrName);
+  const found = INSTANCE_DEFINITIONS.find((i) => i.code === normalized);
+  if (found) return found;
+  return {
+    code: normalized,
+    name: normalized,
+    color: '#64748b',
+    order_index: 99,
+  };
+}
+
+export const DEFAULT_INSTANCES = INSTANCE_DEFINITIONS;
 
 export function getDefaultNote(activityId: string): StructuredNote {
   return {

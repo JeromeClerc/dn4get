@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Plus, Sparkles, Calendar, Flag, User } from 'lucide-react';
-import { ActivityPriority, Client } from '../../types';
+import { ActivityPriority, ActivityStatus, Client } from '../../types';
 
 interface QuickAddBarProps {
   clients: Client[];
@@ -8,6 +8,7 @@ interface QuickAddBarProps {
     title: string;
     client_id?: string | null;
     priority?: ActivityPriority;
+    status?: ActivityStatus;
     due_date?: string | null;
   }) => Promise<void>;
 }
@@ -30,6 +31,7 @@ export const QuickAddBar: React.FC<QuickAddBarProps> = ({ clients, onAddActivity
         title: title.trim(),
         client_id: clientId || (clients.length > 0 ? clients[0].id : null),
         priority,
+        status: 'en_attente',
         due_date: dueDate ? new Date(dueDate).toISOString() : null,
       });
 

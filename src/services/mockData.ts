@@ -40,12 +40,15 @@ export const INITIAL_CLIENTS: Client[] = [
 ];
 
 export const INITIAL_INSTANCES: DatabaseInstance[] = [
-  { id: 'inst-1', user_id: 'user-default', name: 'Test', code: 'test', color: '#6366f1', order_index: 1 },
-  { id: 'inst-2', user_id: 'user-default', name: 'Intégration', code: 'integration', color: '#3b82f6', order_index: 2 },
-  { id: 'inst-3', user_id: 'user-default', name: 'Dev', code: 'dev', color: '#06b6d4', order_index: 3 },
-  { id: 'inst-4', user_id: 'user-default', name: 'Form', code: 'form', color: '#10b981', order_index: 4 },
-  { id: 'inst-5', user_id: 'user-default', name: 'Pré-prod', code: 'pre-prod', color: '#f59e0b', order_index: 5 },
-  { id: 'inst-6', user_id: 'user-default', name: 'Prod', code: 'prod', color: '#ef4444', order_index: 6 },
+  { id: 'inst-1', user_id: 'user-default', name: 'DEV', code: 'DEV', color: '#0284c7', order_index: 1 },
+  { id: 'inst-2', user_id: 'user-default', name: 'TEST', code: 'TEST', color: '#6366f1', order_index: 2 },
+  { id: 'inst-3', user_id: 'user-default', name: 'QA', code: 'QA', color: '#0d9488', order_index: 3 },
+  { id: 'inst-4', user_id: 'user-default', name: 'INT', code: 'INT', color: '#2563eb', order_index: 4 },
+  { id: 'inst-5', user_id: 'user-default', name: 'REC', code: 'REC', color: '#9333ea', order_index: 5 },
+  { id: 'inst-6', user_id: 'user-default', name: 'FORM', code: 'FORM', color: '#16a34a', order_index: 6 },
+  { id: 'inst-7', user_id: 'user-default', name: 'EQNX', code: 'EQNX', color: '#ea580c', order_index: 7 },
+  { id: 'inst-8', user_id: 'user-default', name: 'PPROD', code: 'PPROD', color: '#d97706', order_index: 8 },
+  { id: 'inst-9', user_id: 'user-default', name: 'PROD', code: 'PROD', color: '#e11d48', order_index: 9 },
 ];
 
 const now = new Date();
@@ -70,13 +73,13 @@ export const INITIAL_ACTIVITIES: Activity[] = [
       {
         id: 'ai-1',
         activity_id: 'act-1',
-        instance_name: 'dev',
+        instance_name: 'DEV',
         completed_at: new Date(Date.now() - 3600000 * 5).toISOString(),
       },
       {
         id: 'ai-2',
         activity_id: 'act-1',
-        instance_name: 'test',
+        instance_name: 'TEST',
         completed_at: new Date(Date.now() - 3600000 * 2).toISOString(),
       },
     ],
@@ -124,7 +127,7 @@ export const INITIAL_ACTIVITIES: Activity[] = [
       {
         id: 'ai-3',
         activity_id: 'act-2',
-        instance_name: 'dev',
+        instance_name: 'DEV',
         completed_at: new Date(Date.now() - 3600000 * 12).toISOString(),
       },
     ],
@@ -188,10 +191,10 @@ export const INITIAL_ACTIVITIES: Activity[] = [
     updated_at: new Date(Date.now() - 86400000).toISOString(),
     client: INITIAL_CLIENTS[3],
     instances: [
-      { id: 'ai-4', activity_id: 'act-4', instance_name: 'test', completed_at: new Date(Date.now() - 86400000 * 4).toISOString() },
-      { id: 'ai-5', activity_id: 'act-4', instance_name: 'integration', completed_at: new Date(Date.now() - 86400000 * 3).toISOString() },
-      { id: 'ai-6', activity_id: 'act-4', instance_name: 'pre-prod', completed_at: new Date(Date.now() - 86400000 * 2).toISOString() },
-      { id: 'ai-7', activity_id: 'act-4', instance_name: 'prod', completed_at: new Date(Date.now() - 86400000).toISOString() },
+      { id: 'ai-4', activity_id: 'act-4', instance_name: 'TEST', completed_at: new Date(Date.now() - 86400000 * 4).toISOString() },
+      { id: 'ai-5', activity_id: 'act-4', instance_name: 'INT', completed_at: new Date(Date.now() - 86400000 * 3).toISOString() },
+      { id: 'ai-6', activity_id: 'act-4', instance_name: 'PPROD', completed_at: new Date(Date.now() - 86400000 * 2).toISOString() },
+      { id: 'ai-7', activity_id: 'act-4', instance_name: 'PROD', completed_at: new Date(Date.now() - 86400000).toISOString() },
     ],
     note: {
       id: 'note-4',

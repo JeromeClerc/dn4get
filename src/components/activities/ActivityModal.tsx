@@ -26,7 +26,7 @@ import {
   NoteParams,
   StructuredNote,
 } from '../../types';
-import { STATUS_CONFIG, PRIORITY_CONFIG, getDefaultNote, triggerConfetti } from '../../lib/utils';
+import { STATUS_CONFIG, PRIORITY_CONFIG, getDefaultNote, triggerConfetti, normalizeInstanceCode } from '../../lib/utils';
 
 interface ActivityModalProps {
   activity: Activity | null;
@@ -160,7 +160,7 @@ export const ActivityModal: React.FC<ActivityModalProps> = ({
     }
   };
 
-  const completedSet = new Set((activity.instances || []).map((i) => i.instance_name));
+  const completedSet = new Set((activity.instances || []).map((i) => normalizeInstanceCode(i.instance_name)));
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4 animate-in fade-in duration-200">
@@ -452,8 +452,9 @@ export const ActivityModal: React.FC<ActivityModalProps> = ({
 
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                 {instances.map((inst) => {
-                  const isDone = completedSet.has(inst.code);
-                  const instData = (activity.instances || []).find((i) => i.instance_name === inst.code);
+                  const canonCode = normalizeInstanceCode(inst.code);
+                  const isDone = completedSet.has(canonCode);
+                  const instData = (activity.instances || []).find((i) => normalizeInstanceCode(i.instance_name) === canonCode);
 
                   return (
                     <div
@@ -466,9 +467,15 @@ export const ActivityModal: React.FC<ActivityModalProps> = ({
                       }`}
                     >
                       <div className="flex items-center justify-between mb-2">
-                        <span className="font-bold text-sm text-slate-900 dark:text-slate-100">
-                          {inst.name}
-                        </span>
+                        <div className="flex items-center gap-2">
+                          <span
+                            className="w-2.5 h-2.5 rounded-full shrink-0"
+                            style={{ backgroundColor: inst.color }}
+                          />
+                          <span className="font-bold text-sm text-slate-900 dark:text-slate-100">
+                            {inst.name}
+                          </span>
+                        </div>
                         <input
                           type="checkbox"
                           checked={isDone}
