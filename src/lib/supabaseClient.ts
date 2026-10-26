@@ -1,0 +1,35 @@
+import { createClient } from '@supabase/supabase-js';
+
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+
+// Détection de la configuration Supabase valide
+export const isSupabaseConfigured = Boolean(
+  supabaseUrl &&
+  supabaseAnonKey &&
+  !supabaseUrl.includes('votre-projet') &&
+  supabaseUrl.startsWith('https://')
+);
+
+if (!isSupabaseConfigured) {
+  console.info(
+    'ℹ️ Supabase n\'est pas encore configuré ou les clés sont absentes. L\'application utilise le mode local persistant (LocalStorage / Démo).'
+  );
+}
+
+// Client Supabase réel ou fallback client factice pour éviter les erreurs d'instanciation
+export const supabase = isSupabaseConfigured
+  ? createClient(supabaseUrl, supabaseAnonKey, {
+      auth: {
+        persistSession: true,
+        autoRefreshToken: true,
+      },
+      realtime: {
+        params: {
+          eventsPerSecond: 10,
+        },
+      },
+    })
+  : createClient('https://mock-dn4get.supabase.co', 'mock-anon-key', {
+      auth: { persistSession: false },
+    });

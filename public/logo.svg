@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="100%" height="100%">
+  <defs>
+    <linearGradient id="dn4get-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#3b82f6" />
+      <stop offset="50%" stop-color="#6366f1" />
+      <stop offset="100%" stop-color="#06b6d4" />
+    </linearGradient>
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="8" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+  </defs>
+  <rect width="200" height="200" rx="44" fill="#0f172a" />
+  <rect x="12" y="12" width="176" height="176" rx="36" fill="none" stroke="url(#dn4get-grad)" stroke-width="3" stroke-opacity="0.4" />
+  
+  <!-- Outer Stylized 'D' and '4' Hexagon Loop -->
+  <path d="M 60 48 L 120 48 C 145 48 162 66 162 92 C 162 112 148 128 130 134 L 164 165 L 140 165 L 110 137 L 84 137 L 84 165 L 60 165 Z M 84 70 L 84 116 L 118 116 C 132 116 138 106 138 93 C 138 80 132 70 118 70 Z" fill="url(#dn4get-grad)" filter="url(#glow)" />
+  
+  <!-- Glowing Check / 4 Accent Indicator -->
+  <circle cx="148" cy="56" r="10" fill="#10b981" />
+  <path d="M 143 56 L 147 60 L 153 53" fill="none" stroke="#ffffff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
+</svg>
