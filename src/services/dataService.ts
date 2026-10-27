@@ -117,7 +117,7 @@ export const dataService = {
     status?: Activity['status'];
     due_date?: string | null;
   }): Promise<Activity> {
-    const defaultStatus: Activity['status'] = payload.status || 'en_attente';
+    const defaultStatus: Activity['status'] = payload.status || 'ouvert';
 
     if (!isSupabaseConfigured) {
       const activities = getLocalItem<Activity[]>(STORAGE_KEYS.ACTIVITIES, INITIAL_ACTIVITIES);

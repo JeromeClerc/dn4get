@@ -12,7 +12,7 @@ export const STATUS_CONFIG: Record<
   { label: string; color: string; bgLight: string; bgDark: string; border: string; iconColor: string }
 > = {
   ouvert: {
-    label: 'Ouvert',
+    label: 'Inbox',
     color: 'text-blue-700 dark:text-blue-300',
     bgLight: 'bg-blue-50',
     bgDark: 'dark:bg-blue-950/60',

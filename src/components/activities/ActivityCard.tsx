@@ -2,9 +2,6 @@ import React, { useState, useRef, useEffect } from 'react';
 import {
   Calendar,
   CheckCircle,
-  Clock,
-  ExternalLink,
-  FileText,
   Paperclip,
   Trash2,
   Edit3,
@@ -43,8 +40,8 @@ export const ActivityCard: React.FC<ActivityCardProps> = ({
   const [showAddMenu, setShowAddMenu] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
-  const statusCfg = STATUS_CONFIG[activity.status];
-  const priorityCfg = PRIORITY_CONFIG[activity.priority];
+  const statusCfg = STATUS_CONFIG[activity.status] || STATUS_CONFIG.ouvert;
+  const priorityCfg = PRIORITY_CONFIG[activity.priority] || PRIORITY_CONFIG.normal;
   const dueStatus = getDueDateStatus(activity.due_date);
 
   const completedInstances = activity.instances || [];
@@ -70,7 +67,7 @@ export const ActivityCard: React.FC<ActivityCardProps> = ({
 
   const handleQuickComplete = (e: React.MouseEvent) => {
     e.stopPropagation();
-    const nextStatus: ActivityStatus = activity.status === 'termine' ? 'en_attente' : 'termine';
+    const nextStatus: ActivityStatus = activity.status === 'termine' ? 'ouvert' : 'termine';
     if (nextStatus === 'termine') {
       triggerConfetti();
     }
@@ -80,17 +77,17 @@ export const ActivityCard: React.FC<ActivityCardProps> = ({
   return (
     <div
       onClick={() => onEdit(activity)}
-      className={`group relative w-full bg-white dark:bg-slate-900 rounded-xl border transition-all duration-150 p-3 sm:px-4 sm:py-2.5 shadow-sm hover:shadow-md hover:border-blue-400 dark:hover:border-blue-500 cursor-pointer flex flex-col lg:flex-row lg:items-center gap-3 lg:gap-3.5 ${
+      className={`group relative w-full bg-white dark:bg-slate-900 rounded-xl border transition-all duration-150 p-2.5 sm:px-3 sm:py-2 shadow-xs hover:shadow-md hover:border-blue-400 dark:hover:border-blue-500 cursor-pointer flex flex-col md:flex-row md:items-center gap-2 md:gap-3 box-border overflow-hidden ${
         activity.status === 'termine'
           ? 'border-slate-200/60 dark:border-slate-800/60 opacity-80 bg-slate-50/50 dark:bg-slate-900/40'
           : 'border-slate-200 dark:border-slate-800'
       }`}
     >
       {/* 1. CLIENT */}
-      <div className="w-full lg:w-36 shrink-0 flex items-center">
+      <div className="w-auto md:w-32 shrink-0 flex items-center">
         {activity.client ? (
           <span
-            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold tracking-wide truncate max-w-full"
+            className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg text-xs font-bold tracking-wide truncate max-w-full"
             style={{
               backgroundColor: `${activity.client.color}15`,
               color: activity.client.color,
@@ -116,9 +113,10 @@ export const ActivityCard: React.FC<ActivityCardProps> = ({
         )}
       </div>
 
-      {/* 2. LIBELLÉ */}
-      <div className="flex-1 min-w-[200px] flex items-center gap-2.5">
+      {/* 2. LIBELLÉ (Flexible avec min-w-0 et truncate pour ne jamais déborder) */}
+      <div className="flex-1 min-w-0 flex items-center gap-2">
         <button
+          type="button"
           onClick={handleQuickComplete}
           className={`shrink-0 transition-transform active:scale-90 ${
             activity.status === 'termine'
@@ -131,7 +129,7 @@ export const ActivityCard: React.FC<ActivityCardProps> = ({
         </button>
 
         <span
-          className={`font-semibold text-sm leading-snug break-words flex-1 hover:text-blue-600 dark:hover:text-blue-400 transition-colors ${
+          className={`font-semibold text-sm leading-snug truncate hover:text-blue-600 dark:hover:text-blue-400 transition-colors ${
             activity.status === 'termine'
               ? 'line-through text-slate-400 dark:text-slate-500'
               : 'text-slate-900 dark:text-slate-100'
@@ -157,7 +155,7 @@ export const ActivityCard: React.FC<ActivityCardProps> = ({
 
       {/* 3. STATUT */}
       <div
-        className="w-full sm:w-auto lg:w-32 shrink-0 flex items-center"
+        className="w-auto md:w-28 shrink-0 flex items-center"
         onClick={(e) => e.stopPropagation()}
       >
         <select
@@ -167,7 +165,7 @@ export const ActivityCard: React.FC<ActivityCardProps> = ({
             if (val === 'termine') triggerConfetti();
             onUpdateStatus(activity.id, val);
           }}
-          className={`w-full text-xs font-semibold px-2.5 py-1.5 rounded-lg border cursor-pointer focus:outline-none transition-colors ${statusCfg.bgLight} ${statusCfg.bgDark} ${statusCfg.color} ${statusCfg.border}`}
+          className={`w-full text-xs font-semibold px-2 py-1 rounded-lg border cursor-pointer focus:outline-none transition-colors ${statusCfg.bgLight} ${statusCfg.bgDark} ${statusCfg.color} ${statusCfg.border}`}
         >
           {Object.entries(STATUS_CONFIG).map(([k, cfg]) => (
             <option
@@ -182,27 +180,27 @@ export const ActivityCard: React.FC<ActivityCardProps> = ({
       </div>
 
       {/* 4. URGENCE (PRIORITÉ) */}
-      <div className="w-full sm:w-auto lg:w-28 shrink-0 flex items-center">
+      <div className="w-auto md:w-24 shrink-0 flex items-center">
         <span
-          className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold ${priorityCfg.badge}`}
+          className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg text-xs font-semibold ${priorityCfg.badge}`}
         >
           <span className={`w-1.5 h-1.5 rounded-full ${priorityCfg.dot}`} />
           {priorityCfg.label}
         </span>
       </div>
 
-      {/* 5. INSTANCES (Mode Tags avec bouton d'ajout) */}
+      {/* 5. INSTANCES (Empilées l'une au-dessus de l'autre, largeur réduite) */}
       <div
-        className="w-full sm:w-auto lg:w-56 xl:w-64 shrink-0 flex items-center flex-wrap gap-1.5"
+        className="shrink-0 flex flex-col gap-1 items-start min-w-[55px] max-w-[90px]"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Tags d'instances déjà assignées */}
+        {/* Tags d'instances déjà assignées, affichées les unes au-dessus des autres */}
         {completedInstances.map((ci) => {
           const info = getInstanceInfo(ci.instance_name);
           return (
             <span
               key={ci.instance_name}
-              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-bold shadow-sm transition-all group/tag"
+              className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold shadow-xs transition-all"
               style={{
                 backgroundColor: `${info.color}18`,
                 color: info.color,
@@ -210,12 +208,12 @@ export const ActivityCard: React.FC<ActivityCardProps> = ({
               }}
               title={`${info.name} : Validé le ${formatDateTimeFr(ci.completed_at)} (cliquer pour retirer)`}
             >
-              <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: info.color }} />
+              <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: info.color }} />
               <span>{info.name}</span>
               <button
                 type="button"
                 onClick={() => onToggleInstance(activity.id, info.code)}
-                className="ml-0.5 hover:bg-black/10 dark:hover:bg-white/10 rounded p-0.5 text-current transition-colors"
+                className="hover:bg-black/10 dark:hover:bg-white/10 rounded p-0.5 text-current transition-colors ml-0.5"
                 title="Retirer cette instance"
               >
                 <X className="w-2.5 h-2.5" />
@@ -224,21 +222,21 @@ export const ActivityCard: React.FC<ActivityCardProps> = ({
           );
         })}
 
-        {/* Bouton pour ajouter une instance façon tag */}
+        {/* Bouton discret pour ajouter une instance */}
         {availableInstances.length > 0 && (
           <div className="relative inline-block" ref={menuRef}>
             <button
               type="button"
               onClick={() => setShowAddMenu(!showAddMenu)}
-              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-medium border border-dashed border-slate-300 dark:border-slate-700 text-slate-500 hover:text-blue-600 hover:border-blue-400 dark:hover:border-blue-500 transition-colors bg-slate-50/50 dark:bg-slate-800/40"
+              className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-medium border border-dashed border-slate-300 dark:border-slate-700 text-slate-500 hover:text-blue-600 hover:border-blue-400 dark:hover:border-blue-500 transition-colors bg-slate-50/50 dark:bg-slate-800/40"
               title="Ajouter une instance"
             >
-              <Plus className="w-3 h-3" />
-              <span>Instance</span>
+              <Plus className="w-2.5 h-2.5" />
+              <span>Inst.</span>
             </button>
 
             {showAddMenu && (
-              <div className="absolute left-0 mt-1 z-30 w-44 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-xl py-1 text-xs animate-in fade-in zoom-in-95 duration-100">
+              <div className="absolute right-0 md:left-0 mt-1 z-30 w-44 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-xl py-1 text-xs animate-in fade-in zoom-in-95 duration-100">
                 <div className="px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-slate-400 border-b border-slate-100 dark:border-slate-800">
                   Ajouter une instance
                 </div>
@@ -270,11 +268,11 @@ export const ActivityCard: React.FC<ActivityCardProps> = ({
         )}
       </div>
 
-      {/* 6. ÉCHÉANCE */}
-      <div className="w-full sm:w-auto lg:w-32 shrink-0 flex items-center">
+      {/* 6. ÉCHÉANCE (Largeur réduite au strict minimum) */}
+      <div className="shrink-0 flex items-center whitespace-nowrap">
         {activity.due_date ? (
           <span
-            className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs font-medium ${
+            className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-lg text-xs font-medium whitespace-nowrap ${
               dueStatus.isOverdue
                 ? 'bg-rose-50 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300 font-bold'
                 : dueStatus.isToday
@@ -286,46 +284,42 @@ export const ActivityCard: React.FC<ActivityCardProps> = ({
             {dueStatus.isOverdue ? (
               <AlertTriangle className="w-3.5 h-3.5 text-rose-500 shrink-0" />
             ) : (
-              <Calendar className="w-3.5 h-3.5 shrink-0" />
+              <Calendar className="w-3.5 h-3.5 text-slate-400 shrink-0" />
             )}
             <span>{formatDateShortFr(activity.due_date)}</span>
           </span>
         ) : (
-          <span className="text-slate-400 dark:text-slate-500 text-xs">-</span>
+          <span className="text-slate-400 dark:text-slate-500 text-xs px-1">-</span>
         )}
       </div>
 
       {/* 7. MODIFIER */}
-      <div
-        className="w-auto lg:w-9 shrink-0 flex items-center justify-center"
-        onClick={(e) => e.stopPropagation()}
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          onEdit(activity);
+        }}
+        className="shrink-0 p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-slate-800 transition-colors"
+        title="Modifier l'activité et sa note structurée"
       >
-        <button
-          onClick={() => onEdit(activity)}
-          className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-slate-800 transition-colors"
-          title="Modifier l'activité et sa note structurée"
-        >
-          <Edit3 className="w-4 h-4" />
-        </button>
-      </div>
+        <Edit3 className="w-4 h-4" />
+      </button>
 
       {/* 8. SUPPRIMER */}
-      <div
-        className="w-auto lg:w-9 shrink-0 flex items-center justify-center"
-        onClick={(e) => e.stopPropagation()}
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          if (confirm('Voulez-vous vraiment supprimer cette activité ?')) {
+            onDelete(activity.id);
+          }
+        }}
+        className="shrink-0 p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-slate-800 transition-colors"
+        title="Supprimer"
       >
-        <button
-          onClick={() => {
-            if (confirm('Voulez-vous vraiment supprimer cette activité ?')) {
-              onDelete(activity.id);
-            }
-          }}
-          className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-slate-800 transition-colors"
-          title="Supprimer"
-        >
-          <Trash2 className="w-4 h-4" />
-        </button>
-      </div>
+        <Trash2 className="w-4 h-4" />
+      </button>
     </div>
   );
 };

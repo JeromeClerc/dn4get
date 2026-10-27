@@ -103,7 +103,7 @@ function MainDashboard() {
               <p className="text-xl sm:text-2xl font-black text-slate-900 dark:text-slate-100">
                 {openCount}
               </p>
-              <p className="text-xs text-slate-500 dark:text-slate-400">En cours / Ouvertes</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400">En cours / Inbox</p>
             </div>
           </div>
 
@@ -180,35 +180,20 @@ function MainDashboard() {
               </p>
             </div>
           ) : (
-            <div className="w-full flex flex-col gap-2">
-              {/* Entête des colonnes sur grand écran */}
-              <div className="hidden lg:flex items-center gap-3.5 px-4 py-2 text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider bg-slate-100/60 dark:bg-slate-900/40 rounded-xl border border-slate-200/60 dark:border-slate-800/60">
-                <div className="w-36 shrink-0">Client</div>
-                <div className="flex-1 min-w-[200px]">Libellé</div>
-                <div className="w-32 shrink-0">Statut</div>
-                <div className="w-28 shrink-0">Urgence</div>
-                <div className="w-56 xl:w-64 shrink-0">Instances</div>
-                <div className="w-32 shrink-0">Échéance</div>
-                <div className="w-9 shrink-0 text-center">Éditer</div>
-                <div className="w-9 shrink-0 text-center">Suppr.</div>
-              </div>
-
-              {/* Lignes d'activités pleine largeur */}
-              <div className="flex flex-col gap-2 w-full">
-                {activities.map((act) => (
-                  <ActivityCard
-                    key={act.id}
-                    activity={act}
-                    instances={instances}
-                    onEdit={(activityToEdit) => setSelectedActivity(activityToEdit)}
-                    onDelete={(id) => deleteActivity(id)}
-                    onUpdateStatus={(id, status) => updateActivity({ id, updates: { status } })}
-                    onToggleInstance={(actId, instCode) =>
-                      toggleInstance({ activityId: actId, instanceName: instCode })
-                    }
-                  />
-                ))}
-              </div>
+            <div className="flex flex-col gap-2 w-full">
+              {activities.map((act) => (
+                <ActivityCard
+                  key={act.id}
+                  activity={act}
+                  instances={instances}
+                  onEdit={(activityToEdit) => setSelectedActivity(activityToEdit)}
+                  onDelete={(id) => deleteActivity(id)}
+                  onUpdateStatus={(id, status) => updateActivity({ id, updates: { status } })}
+                  onToggleInstance={(actId, instCode) =>
+                    toggleInstance({ activityId: actId, instanceName: instCode })
+                  }
+                />
+              ))}
             </div>
           )}
         </div>

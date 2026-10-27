@@ -31,7 +31,7 @@ export const QuickAddBar: React.FC<QuickAddBarProps> = ({ clients, onAddActivity
         title: title.trim(),
         client_id: clientId || (clients.length > 0 ? clients[0].id : null),
         priority,
-        status: 'en_attente',
+        status: 'ouvert',
         due_date: dueDate ? new Date(dueDate).toISOString() : null,
       });
 
