@@ -176,12 +176,15 @@ BEGIN
     -- Insérer les instances par défaut pour ce nouvel utilisateur
     INSERT INTO public.instances (user_id, name, code, color, order_index)
     VALUES
-        (NEW.id, 'Test', 'test', '#6366f1', 1),
-        (NEW.id, 'Intégration', 'integration', '#3b82f6', 2),
-        (NEW.id, 'Développement', 'dev', '#06b6d4', 3),
-        (NEW.id, 'Formation', 'form', '#10b981', 4),
-        (NEW.id, 'Pré-production', 'pre-prod', '#f59e0b', 5),
-        (NEW.id, 'Production', 'prod', '#ef4444', 6)
+        (NEW.id, 'DEV', 'DEV', '#0284c7', 1),
+        (NEW.id, 'TEST', 'TEST', '#6366f1', 2),
+        (NEW.id, 'QA', 'QA', '#0d9488', 3),
+        (NEW.id, 'INT', 'INT', '#2563eb', 4),
+        (NEW.id, 'REC', 'REC', '#9333ea', 5),
+        (NEW.id, 'FORM', 'FORM', '#16a34a', 6),
+        (NEW.id, 'EQNX', 'EQNX', '#ea580c', 7),
+        (NEW.id, 'PPROD', 'PPROD', '#d97706', 8),
+        (NEW.id, 'PROD', 'PROD', '#e11d48', 9)
     ON CONFLICT DO NOTHING;
 
     RETURN NEW;
