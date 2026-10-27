@@ -9,7 +9,7 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 -- 2. TYPES ENUM
 DO $$ BEGIN
-    CREATE TYPE activity_status AS ENUM ('ouvert', 'en_cours', 'bloque', 'en_attente', 'termine');
+    CREATE TYPE activity_status AS ENUM ('ouvert', 'en_cours', 'en_test', 'bloque', 'en_attente', 'termine');
 EXCEPTION
     WHEN duplicate_object THEN null;
 END $$;

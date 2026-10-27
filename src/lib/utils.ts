@@ -27,6 +27,14 @@ export const STATUS_CONFIG: Record<
     border: 'border-amber-200 dark:border-amber-800',
     iconColor: 'text-amber-500',
   },
+  en_test: {
+    label: 'En test',
+    color: 'text-indigo-700 dark:text-indigo-300',
+    bgLight: 'bg-indigo-50',
+    bgDark: 'dark:bg-indigo-950/60',
+    border: 'border-indigo-200 dark:border-indigo-800',
+    iconColor: 'text-indigo-500',
+  },
   bloque: {
     label: 'Bloqué',
     color: 'text-rose-700 dark:text-rose-300',

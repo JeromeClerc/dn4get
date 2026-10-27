@@ -66,7 +66,7 @@ function MainDashboard() {
   } = useDn4Get(filters);
 
   // Statistiques rapides
-  const openCount = allActivities.filter((a) => a.status === 'ouvert' || a.status === 'en_cours').length;
+  const openCount = allActivities.filter((a) => a.status === 'ouvert' || a.status === 'en_cours' || a.status === 'en_test').length;
   const blockedCount = allActivities.filter((a) => a.status === 'bloque').length;
   const completedCount = allActivities.filter((a) => a.status === 'termine').length;
 

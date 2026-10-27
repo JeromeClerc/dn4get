@@ -1,4 +1,4 @@
-export type ActivityStatus = 'ouvert' | 'en_cours' | 'bloque' | 'en_attente' | 'termine';
+export type ActivityStatus = 'ouvert' | 'en_cours' | 'en_test' | 'bloque' | 'en_attente' | 'termine';
 export type ActivityPriority = 'faible' | 'normal' | 'elevee' | 'critique';
 
 export interface Client {
