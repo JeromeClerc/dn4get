@@ -142,7 +142,12 @@ export const ActivityCard: React.FC<ActivityCardProps> = ({
         {/* Badges discrets complémentaires */}
         {activity.note?.rdo && (
           <span className="hidden xl:inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-mono font-semibold bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 shrink-0">
-            RDO: {activity.note.rdo}
+            RDO: {activity.note.rdo.split('\n')[0]}
+            {activity.note.rdo.includes('\n') && activity.note.rdo.split('\n').filter(Boolean).length > 1 && (
+              <span className="ml-1 opacity-70">
+                (+{activity.note.rdo.split('\n').filter(Boolean).length - 1})
+              </span>
+            )}
           </span>
         )}
         {activity.attachments && activity.attachments.length > 0 && (

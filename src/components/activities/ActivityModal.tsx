@@ -16,6 +16,13 @@ import {
   Code,
   Shield,
   ExternalLink,
+  Pencil,
+  Check,
+  UserCheck,
+  FileCode,
+  Sliders,
+  Terminal,
+  Hash,
 } from 'lucide-react';
 import {
   Activity,
@@ -27,6 +34,223 @@ import {
   StructuredNote,
 } from '../../types';
 import { STATUS_CONFIG, PRIORITY_CONFIG, getDefaultNote, triggerConfetti } from '../../lib/utils';
+
+// Helper pour convertir une valeur texte en tableau de chaînes
+const parseStringToList = (val?: string): string[] => {
+  if (!val) return [];
+  if (val.includes('\n')) {
+    return val.split('\n').map((s) => s.trim()).filter(Boolean);
+  }
+  if (val.includes(',') && !val.includes('=')) {
+    return val.split(',').map((s) => s.trim()).filter(Boolean);
+  }
+  const trimmed = val.trim();
+  return trimmed ? [trimmed] : [];
+};
+
+// Sous-composant pour les champs dynamiques avec ajout par Entrée, modification et suppression
+interface DynamicListFieldProps {
+  label: string;
+  stepNumber: number;
+  icon: React.ReactNode;
+  placeholder: string;
+  items: string[];
+  onChange: (items: string[]) => void;
+  helperText?: string;
+}
+
+const DynamicListField: React.FC<DynamicListFieldProps> = ({
+  label,
+  stepNumber,
+  icon,
+  placeholder,
+  items,
+  onChange,
+  helperText,
+}) => {
+  const [inputValue, setInputValue] = useState('');
+  const [editingIndex, setEditingIndex] = useState<number | null>(null);
+  const [editingText, setEditingText] = useState('');
+
+  const handleAddItem = () => {
+    const trimmed = inputValue.trim();
+    if (!trimmed) return;
+    onChange([...items, trimmed]);
+    setInputValue('');
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      e.stopPropagation();
+      handleAddItem();
+    }
+  };
+
+  const handleDeleteItem = (indexToDelete: number) => {
+    onChange(items.filter((_, i) => i !== indexToDelete));
+    if (editingIndex === indexToDelete) {
+      setEditingIndex(null);
+    } else if (editingIndex !== null && editingIndex > indexToDelete) {
+      setEditingIndex(editingIndex - 1);
+    }
+  };
+
+  const handleStartEdit = (idx: number) => {
+    setEditingIndex(idx);
+    setEditingText(items[idx]);
+  };
+
+  const handleSaveEdit = (idx: number) => {
+    const trimmed = editingText.trim();
+    if (!trimmed) {
+      setEditingIndex(null);
+      return;
+    }
+    const next = [...items];
+    next[idx] = trimmed;
+    onChange(next);
+    setEditingIndex(null);
+  };
+
+  const handleCancelEdit = () => {
+    setEditingIndex(null);
+  };
+
+  const handleEditKeyDown = (e: React.KeyboardEvent<HTMLInputElement>, idx: number) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      e.stopPropagation();
+      handleSaveEdit(idx);
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      e.stopPropagation();
+      handleCancelEdit();
+    }
+  };
+
+  return (
+    <div className="bg-slate-50 dark:bg-slate-950/60 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-3">
+      {/* En-tête du champ */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <span className="w-5 h-5 rounded-md bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 flex items-center justify-center text-[10px] font-bold">
+            {stepNumber}
+          </span>
+          <div className="flex items-center gap-1.5 text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
+            {icon}
+            <span>{label}</span>
+          </div>
+        </div>
+        {items.length > 0 && (
+          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 dark:bg-blue-900/60 text-blue-700 dark:text-blue-300">
+            {items.length} {items.length > 1 ? 'éléments' : 'élément'}
+          </span>
+        )}
+      </div>
+
+      {/* Saisie avec validation par touche Entrée ou bouton */}
+      <div className="flex items-center gap-2">
+        <input
+          type="text"
+          value={inputValue}
+          onChange={(e) => setInputValue(e.target.value)}
+          onKeyDown={handleKeyDown}
+          placeholder={placeholder}
+          className="flex-1 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-mono bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 transition-all placeholder:text-slate-400"
+        />
+        <button
+          type="button"
+          onClick={handleAddItem}
+          disabled={!inputValue.trim()}
+          className="px-3 py-2 rounded-xl text-xs font-semibold bg-blue-600 hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed text-white flex items-center gap-1 transition-all shrink-0 shadow-sm active:scale-95"
+          title="Ajouter à la liste (ou Entrée)"
+        >
+          <Plus className="w-3.5 h-3.5" />
+          <span className="hidden sm:inline">Ajouter</span>
+        </button>
+      </div>
+
+      {helperText && items.length === 0 && (
+        <p className="text-[11px] text-slate-400 italic">{helperText}</p>
+      )}
+
+      {/* Liste dynamique qui apparaît dès la première saisie */}
+      {items.length > 0 && (
+        <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1 animate-in fade-in duration-200">
+          {items.map((item, idx) => (
+            <div
+              key={idx}
+              className="group flex items-center justify-between gap-2 px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 transition-all text-xs"
+            >
+              {editingIndex === idx ? (
+                <div className="flex items-center gap-1.5 w-full">
+                  <input
+                    type="text"
+                    autoFocus
+                    value={editingText}
+                    onChange={(e) => setEditingText(e.target.value)}
+                    onKeyDown={(e) => handleEditKeyDown(e, idx)}
+                    className="flex-1 px-2.5 py-1 rounded-lg text-xs font-mono bg-slate-50 dark:bg-slate-800 border border-blue-500 text-slate-900 dark:text-slate-100 focus:outline-none ring-1 ring-blue-500"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => handleSaveEdit(idx)}
+                    className="p-1.5 rounded-lg text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/50 transition-colors"
+                    title="Valider la modification (Entrée)"
+                  >
+                    <Check className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleCancelEdit}
+                    className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                    title="Annuler (Échap)"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <div className="flex items-center gap-2 min-w-0 flex-1">
+                    <span className="text-[10px] font-mono text-slate-400 shrink-0">
+                      #{idx + 1}
+                    </span>
+                    <span
+                      className="font-mono text-slate-800 dark:text-slate-200 truncate select-all cursor-pointer"
+                      title={`${item} (Double-clic pour modifier)`}
+                      onDoubleClick={() => handleStartEdit(idx)}
+                    >
+                      {item}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => handleStartEdit(idx)}
+                      className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/50 transition-colors"
+                      title="Modifier cette ligne"
+                    >
+                      <Pencil className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteItem(idx)}
+                      className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/50 transition-colors"
+                      title="Supprimer cette ligne"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
 
 interface ActivityModalProps {
   activity: Activity | null;
@@ -64,18 +288,18 @@ export const ActivityModal: React.FC<ActivityModalProps> = ({
     activity.due_date ? activity.due_date.substring(0, 16) : ''
   );
 
-  // Note structurée
+  // Note structurée & champs dynamiques
   const initialNote = activity.note || getDefaultNote(activity.id);
   const [urls, setUrls] = useState<string[]>(initialNote.urls || []);
   const [newUrl, setNewUrl] = useState('');
-  const [usurper, setUsurper] = useState(initialNote.usurper || '');
-  const [xslLibraries, setXslLibraries] = useState(initialNote.xsl_libraries || '');
+  const [usurperList, setUsurperList] = useState<string[]>(() => parseStringToList(initialNote.usurper));
+  const [xslLibrariesList, setXslLibrariesList] = useState<string[]>(() => parseStringToList(initialNote.xsl_libraries));
   const [params, setParams] = useState<NoteParams>(
     initialNote.params || { portail: '', onglet: '', cellule: '', details: '' }
   );
-  const [variables, setVariables] = useState(initialNote.variables || '');
-  const [ewxsladm, setEwxsladm] = useState(initialNote.ewxsladm || '');
-  const [rdo, setRdo] = useState(initialNote.rdo || '');
+  const [variablesList, setVariablesList] = useState<string[]>(() => parseStringToList(initialNote.variables));
+  const [ewxsladmList, setEwxsladmList] = useState<string[]>(() => parseStringToList(initialNote.ewxsladm));
+  const [rdoList, setRdoList] = useState<string[]>(() => parseStringToList(initialNote.rdo));
 
   const [activeTab, setActiveTab] = useState<'general' | 'note' | 'instances' | 'attachments'>('note');
   const [isSaving, setIsSaving] = useState(false);
@@ -90,12 +314,12 @@ export const ActivityModal: React.FC<ActivityModalProps> = ({
 
     const note = activity.note || getDefaultNote(activity.id);
     setUrls(note.urls || []);
-    setUsurper(note.usurper || '');
-    setXslLibraries(note.xsl_libraries || '');
+    setUsurperList(parseStringToList(note.usurper));
+    setXslLibrariesList(parseStringToList(note.xsl_libraries));
     setParams(note.params || { portail: '', onglet: '', cellule: '', details: '' });
-    setVariables(note.variables || '');
-    setEwxsladm(note.ewxsladm || '');
-    setRdo(note.rdo || '');
+    setVariablesList(parseStringToList(note.variables));
+    setEwxsladmList(parseStringToList(note.ewxsladm));
+    setRdoList(parseStringToList(note.rdo));
   }, [activity]);
 
   const handleSave = async () => {
@@ -110,15 +334,15 @@ export const ActivityModal: React.FC<ActivityModalProps> = ({
         due_date: dueDate ? new Date(dueDate).toISOString() : null,
       });
 
-      // 2. Sauvegarder la note structurée
+      // 2. Sauvegarder la note structurée (listes sérialisées par saut de ligne)
       await onSaveNote(activity.id, {
         urls,
-        usurper,
-        xsl_libraries: xslLibraries,
+        usurper: usurperList.join('\n'),
+        xsl_libraries: xslLibrariesList.join('\n'),
         params,
-        variables,
-        ewxsladm,
-        rdo,
+        variables: variablesList.join('\n'),
+        ewxsladm: ewxsladmList.join('\n'),
+        rdo: rdoList.join('\n'),
       });
 
       if (status === 'termine' && activity.status !== 'termine') {
@@ -176,7 +400,7 @@ export const ActivityModal: React.FC<ActivityModalProps> = ({
                 Détails de l'activité
               </h2>
               <p className="text-xs text-slate-500 dark:text-slate-400">
-                Édition complète, suivi d'instances et note structurée
+                Édition complète, suivi d'instances et notes
               </p>
             </div>
           </div>
@@ -220,7 +444,7 @@ export const ActivityModal: React.FC<ActivityModalProps> = ({
         {/* Navigation par Onglets */}
         <div className="px-5 flex border-b border-slate-100 dark:border-slate-800 gap-2 overflow-x-auto">
           {[
-            { id: 'note', label: 'Note Préstructurée', icon: FileText },
+            { id: 'note', label: 'Notes', icon: FileText },
             { id: 'instances', label: 'Instances DB', icon: Layers },
             { id: 'general', label: 'Paramètres Généraux', icon: Shield },
             { id: 'attachments', label: 'Pièces Jointes & Captures', icon: Paperclip },
@@ -247,59 +471,45 @@ export const ActivityModal: React.FC<ActivityModalProps> = ({
         {/* Corps du Modal selon l'onglet actif */}
         <div className="p-5 flex-1 overflow-y-auto space-y-4">
           {/* ========================================================= */}
-          {/* ONGLET 1 : NOTE PRÉSTRUCTURÉE (Le cœur de la demande métier) */}
+          {/* ONGLET 1 : NOTES (Ordonnancement précis 1 à 7)            */}
           {/* ========================================================= */}
           {activeTab === 'note' && (
             <div className="space-y-4">
+              {/* Ligne 1 : 1. Usurper & 2. Librairies XSL */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* RDO */}
-                <div>
-                  <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
-                    RDO (Référence Demande / Ordre)
-                  </label>
-                  <input
-                    type="text"
-                    value={rdo}
-                    onChange={(e) => setRdo(e.target.value)}
-                    placeholder="Ex: RDO-2026-992-BCV"
-                    className="w-full px-3.5 py-2 rounded-xl text-sm font-mono bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
-                  />
-                </div>
+                {/* 1. Usurper */}
+                <DynamicListField
+                  stepNumber={1}
+                  label="Usurper"
+                  icon={<UserCheck className="w-3.5 h-3.5 text-purple-500" />}
+                  placeholder="Ex: admin_sys_bcv ou med_super_user"
+                  items={usurperList}
+                  onChange={setUsurperList}
+                  helperText="Tapez un compte à usurper puis appuyez sur Entrée"
+                />
 
-                {/* Usurper */}
-                <div>
-                  <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
-                    Usurper (Compte utilisateur à usurper)
-                  </label>
-                  <input
-                    type="text"
-                    value={usurper}
-                    onChange={(e) => setUsurper(e.target.value)}
-                    placeholder="Ex: admin_sys_bcv ou med_super_user"
-                    className="w-full px-3.5 py-2 rounded-xl text-sm font-mono bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
-                  />
-                </div>
-              </div>
-
-              {/* Librairies XSL */}
-              <div>
-                <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
-                  Librairies XSL
-                </label>
-                <input
-                  type="text"
-                  value={xslLibraries}
-                  onChange={(e) => setXslLibraries(e.target.value)}
-                  placeholder="Ex: lib-core-transform-v3.xsl, lib-dates-iso.xsl"
-                  className="w-full px-3.5 py-2 rounded-xl text-sm font-mono bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+                {/* 2. Librairies XSL */}
+                <DynamicListField
+                  stepNumber={2}
+                  label="Librairies XSL"
+                  icon={<FileCode className="w-3.5 h-3.5 text-indigo-500" />}
+                  placeholder="Ex: lib-core-transform-v3.xsl"
+                  items={xslLibrariesList}
+                  onChange={setXslLibrariesList}
+                  helperText="Tapez une feuille XSL puis appuyez sur Entrée"
                 />
               </div>
 
-              {/* Section Params (Arborescence : Portail > Onglet > Cellule > Détails) */}
+              {/* 3. Bloc PARAMS (Portail > Onglet > Cellule > Détails) */}
               <div className="bg-slate-50 dark:bg-slate-950/60 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-3">
-                <div className="flex items-center gap-1.5 text-xs font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider">
-                  <Code className="w-3.5 h-3.5" />
-                  <span>Params (Portail &gt; Onglet &gt; Cellule &gt; Détails)</span>
+                <div className="flex items-center gap-2">
+                  <span className="w-5 h-5 rounded-md bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 flex items-center justify-center text-[10px] font-bold">
+                    3
+                  </span>
+                  <div className="flex items-center gap-1.5 text-xs font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider">
+                    <Code className="w-3.5 h-3.5" />
+                    <span>PARAMS (Portail &gt; Onglet &gt; Cellule &gt; Détails)</span>
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -310,7 +520,7 @@ export const ActivityModal: React.FC<ActivityModalProps> = ({
                       value={params.portail}
                       onChange={(e) => setParams({ ...params, portail: e.target.value })}
                       placeholder="Ex: E-Banking"
-                      className="w-full px-3 py-1.5 rounded-lg text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700"
+                      className="w-full px-3 py-1.5 rounded-xl text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
                     />
                   </div>
                   <div>
@@ -320,7 +530,7 @@ export const ActivityModal: React.FC<ActivityModalProps> = ({
                       value={params.onglet}
                       onChange={(e) => setParams({ ...params, onglet: e.target.value })}
                       placeholder="Ex: Paramétrage Flux"
-                      className="w-full px-3 py-1.5 rounded-lg text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700"
+                      className="w-full px-3 py-1.5 rounded-xl text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
                     />
                   </div>
                   <div>
@@ -330,7 +540,7 @@ export const ActivityModal: React.FC<ActivityModalProps> = ({
                       value={params.cellule}
                       onChange={(e) => setParams({ ...params, cellule: e.target.value })}
                       placeholder="Ex: Cellule 4B"
-                      className="w-full px-3 py-1.5 rounded-lg text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700"
+                      className="w-full px-3 py-1.5 rounded-xl text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
                     />
                   </div>
                 </div>
@@ -344,16 +554,64 @@ export const ActivityModal: React.FC<ActivityModalProps> = ({
                     value={params.details}
                     onChange={(e) => setParams({ ...params, details: e.target.value })}
                     placeholder="Instructions détaillées, sélecteurs, comportement attendu..."
-                    className="w-full px-3 py-2 rounded-xl text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 font-mono"
+                    className="w-full px-3 py-2 rounded-xl text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 font-mono text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
                   />
                 </div>
               </div>
 
-              {/* URLs */}
+              {/* Ligne 2 : 4. Variables & 5. Ewxsladm */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* 4. Variables */}
+                <DynamicListField
+                  stepNumber={4}
+                  label="Variables"
+                  icon={<Sliders className="w-3.5 h-3.5 text-amber-500" />}
+                  placeholder="Ex: ENV=INTEGRATION"
+                  items={variablesList}
+                  onChange={setVariablesList}
+                  helperText="Tapez une variable clé=valeur puis appuyez sur Entrée"
+                />
+
+                {/* 5. Ewxsladm */}
+                <DynamicListField
+                  stepNumber={5}
+                  label="Ewxsladm"
+                  icon={<Terminal className="w-3.5 h-3.5 text-emerald-500" />}
+                  placeholder="Ex: EXEC_ADMIN_RELOAD_SCHEMA=1"
+                  items={ewxsladmList}
+                  onChange={setEwxsladmList}
+                  helperText="Tapez une commande admin puis appuyez sur Entrée"
+                />
+              </div>
+
+              {/* 6. RDO */}
+              <DynamicListField
+                stepNumber={6}
+                label="RDO"
+                icon={<Hash className="w-3.5 h-3.5 text-rose-500" />}
+                placeholder="Ex: RDO-2026-992-BCV"
+                items={rdoList}
+                onChange={setRdoList}
+                helperText="Tapez une référence RDO puis appuyez sur Entrée"
+              />
+
+              {/* 7. URLs & Liens utiles */}
               <div className="bg-slate-50 dark:bg-slate-950/60 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-3">
-                <div className="flex items-center gap-1.5 text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
-                  <Link className="w-3.5 h-3.5 text-blue-500" />
-                  <span>URLs & Liens utiles</span>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="w-5 h-5 rounded-md bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 flex items-center justify-center text-[10px] font-bold">
+                      7
+                    </span>
+                    <div className="flex items-center gap-1.5 text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
+                      <Link className="w-3.5 h-3.5 text-blue-500" />
+                      <span>URLs & Liens utiles</span>
+                    </div>
+                  </div>
+                  {urls.length > 0 && (
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 dark:bg-blue-900/60 text-blue-700 dark:text-blue-300">
+                      {urls.length} {urls.length > 1 ? 'liens' : 'lien'}
+                    </span>
+                  )}
                 </div>
 
                 <div className="flex items-center gap-2">
@@ -362,7 +620,7 @@ export const ActivityModal: React.FC<ActivityModalProps> = ({
                     value={newUrl}
                     onChange={(e) => setNewUrl(e.target.value)}
                     placeholder="https://..."
-                    className="flex-1 px-3 py-1.5 rounded-lg text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700"
+                    className="flex-1 px-3.5 py-2 rounded-xl text-xs sm:text-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 transition-all placeholder:text-slate-400"
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') {
                         e.preventDefault();
@@ -373,67 +631,43 @@ export const ActivityModal: React.FC<ActivityModalProps> = ({
                   <button
                     type="button"
                     onClick={handleAddUrl}
-                    className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-blue-600 text-white hover:bg-blue-700 flex items-center gap-1"
+                    disabled={!newUrl.trim()}
+                    className="px-3 py-2 rounded-xl text-xs font-semibold bg-blue-600 hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed text-white flex items-center gap-1 transition-all shrink-0 shadow-sm active:scale-95"
+                    title="Ajouter le lien (ou Entrée)"
                   >
                     <Plus className="w-3.5 h-3.5" />
-                    Ajouter
+                    <span className="hidden sm:inline">Ajouter</span>
                   </button>
                 </div>
 
-                <div className="space-y-1.5">
-                  {urls.map((u, i) => (
-                    <div
-                      key={i}
-                      className="flex items-center justify-between gap-2 px-3 py-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs"
-                    >
-                      <a
-                        href={u}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="text-blue-600 dark:text-blue-400 hover:underline truncate flex items-center gap-1.5"
+                {urls.length > 0 && (
+                  <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1 animate-in fade-in duration-200">
+                    {urls.map((u, i) => (
+                      <div
+                        key={i}
+                        className="group flex items-center justify-between gap-2 px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 text-xs hover:border-slate-300 dark:hover:border-slate-700 transition-colors"
                       >
-                        <ExternalLink className="w-3 h-3 shrink-0" />
-                        <span>{u}</span>
-                      </a>
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveUrl(i)}
-                        className="text-slate-400 hover:text-rose-500 p-1"
-                      >
-                        <Trash className="w-3 h-3" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Variables & Ewxsladm */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
-                    Variables (Paires clé/valeur ou environnement)
-                  </label>
-                  <textarea
-                    rows={3}
-                    value={variables}
-                    onChange={(e) => setVariables(e.target.value)}
-                    placeholder="VAR_NAME=valeur..."
-                    className="w-full px-3 py-2 rounded-xl text-xs font-mono bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
-                    Ewxsladm (Commandes ou options administrateur)
-                  </label>
-                  <textarea
-                    rows={3}
-                    value={ewxsladm}
-                    onChange={(e) => setEwxsladm(e.target.value)}
-                    placeholder="Options d'administration xsl..."
-                    className="w-full px-3 py-2 rounded-xl text-xs font-mono bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100"
-                  />
-                </div>
+                        <a
+                          href={u}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-blue-600 dark:text-blue-400 hover:underline truncate flex items-center gap-1.5 flex-1 min-w-0"
+                        >
+                          <ExternalLink className="w-3 h-3 shrink-0" />
+                          <span className="truncate">{u}</span>
+                        </a>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveUrl(i)}
+                          className="text-slate-400 hover:text-rose-500 p-1.5 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-950/50 transition-colors shrink-0"
+                          title="Supprimer ce lien"
+                        >
+                          <Trash className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           )}

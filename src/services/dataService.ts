@@ -42,17 +42,22 @@ export const dataService = {
     if (!isSupabaseConfigured) {
       return getLocalItem<Client[]>(STORAGE_KEYS.CLIENTS, INITIAL_CLIENTS);
     }
+    const { data: user } = await supabase.auth.getUser();
+    if (!user?.user) {
+      return getLocalItem<Client[]>(STORAGE_KEYS.CLIENTS, INITIAL_CLIENTS);
+    }
     const { data, error } = await supabase.from('clients').select('*').order('name');
     if (error) throw error;
-    return data || [];
+    return (data && data.length > 0) ? data : getLocalItem<Client[]>(STORAGE_KEYS.CLIENTS, INITIAL_CLIENTS);
   },
 
   async createClient(client: Partial<Client>): Promise<Client> {
-    if (!isSupabaseConfigured) {
+    const { data: user } = isSupabaseConfigured ? await supabase.auth.getUser() : { data: { user: null } };
+    if (!isSupabaseConfigured || !user?.user) {
       const clients = getLocalItem<Client[]>(STORAGE_KEYS.CLIENTS, INITIAL_CLIENTS);
       const newClient: Client = {
         id: 'client-' + Date.now(),
-        user_id: 'user-default',
+        user_id: user?.user?.id || 'user-default',
         name: client.name || 'Nouveau Client',
         code: client.code || '',
         color: client.color || '#3b82f6',
@@ -62,7 +67,6 @@ export const dataService = {
       setLocalItem(STORAGE_KEYS.CLIENTS, [newClient, ...clients]);
       return newClient;
     }
-    const { data: user } = await supabase.auth.getUser();
     const { data, error } = await supabase
       .from('clients')
       .insert([{ ...client, user_id: user?.user?.id }])
@@ -73,7 +77,8 @@ export const dataService = {
   },
 
   async deleteClient(id: string): Promise<void> {
-    if (!isSupabaseConfigured) {
+    const { data: user } = isSupabaseConfigured ? await supabase.auth.getUser() : { data: { user: null } };
+    if (!isSupabaseConfigured || !user?.user) {
       const clients = getLocalItem<Client[]>(STORAGE_KEYS.CLIENTS, INITIAL_CLIENTS);
       setLocalItem(STORAGE_KEYS.CLIENTS, clients.filter((c) => c.id !== id));
       return;
@@ -101,13 +106,17 @@ export const dataService = {
     if (!isSupabaseConfigured) {
       return getLocalItem<Activity[]>(STORAGE_KEYS.ACTIVITIES, INITIAL_ACTIVITIES);
     }
+    const { data: user } = await supabase.auth.getUser();
+    if (!user?.user) {
+      return getLocalItem<Activity[]>(STORAGE_KEYS.ACTIVITIES, INITIAL_ACTIVITIES);
+    }
     const { data, error } = await supabase
       .from('activities')
       .select('*, client:clients(*), instances:activity_instances(*), note:activity_notes(*), attachments(*)')
       .order('created_at', { ascending: false });
 
     if (error) throw error;
-    return data || [];
+    return (data && data.length > 0) ? data : getLocalItem<Activity[]>(STORAGE_KEYS.ACTIVITIES, INITIAL_ACTIVITIES);
   },
 
   async createActivity(payload: {
@@ -119,7 +128,8 @@ export const dataService = {
   }): Promise<Activity> {
     const defaultStatus: Activity['status'] = payload.status || 'ouvert';
 
-    if (!isSupabaseConfigured) {
+    const { data: user } = isSupabaseConfigured ? await supabase.auth.getUser() : { data: { user: null } };
+    if (!isSupabaseConfigured || !user?.user) {
       const activities = getLocalItem<Activity[]>(STORAGE_KEYS.ACTIVITIES, INITIAL_ACTIVITIES);
       const clients = getLocalItem<Client[]>(STORAGE_KEYS.CLIENTS, INITIAL_CLIENTS);
       const targetClient = clients.find((c) => c.id === payload.client_id);
@@ -127,7 +137,7 @@ export const dataService = {
       const id = 'act-' + Date.now();
       const newActivity: Activity = {
         id,
-        user_id: 'user-default',
+        user_id: user?.user?.id || 'user-default',
         title: payload.title,
         client_id: payload.client_id || null,
         status: defaultStatus,
@@ -144,7 +154,6 @@ export const dataService = {
       return newActivity;
     }
 
-    const { data: user } = await supabase.auth.getUser();
     const { data, error } = await supabase
       .from('activities')
       .insert([
@@ -154,7 +163,7 @@ export const dataService = {
           priority: payload.priority || 'normal',
           status: defaultStatus,
           due_date: payload.due_date || null,
-          user_id: user?.user?.id,
+          user_id: user.user.id,
         },
       ])
       .select('*, client:clients(*), instances:activity_instances(*), note:activity_notes(*)')
@@ -165,7 +174,8 @@ export const dataService = {
   },
 
   async updateActivity(id: string, updates: Partial<Activity>): Promise<Activity> {
-    if (!isSupabaseConfigured) {
+    const { data: user } = isSupabaseConfigured ? await supabase.auth.getUser() : { data: { user: null } };
+    if (!isSupabaseConfigured || !user?.user) {
       const activities = getLocalItem<Activity[]>(STORAGE_KEYS.ACTIVITIES, INITIAL_ACTIVITIES);
       const index = activities.findIndex((a) => a.id === id);
       if (index === -1) throw new Error('Activité introuvable');
@@ -199,7 +209,8 @@ export const dataService = {
   },
 
   async deleteActivity(id: string): Promise<void> {
-    if (!isSupabaseConfigured) {
+    const { data: user } = isSupabaseConfigured ? await supabase.auth.getUser() : { data: { user: null } };
+    if (!isSupabaseConfigured || !user?.user) {
       const activities = getLocalItem<Activity[]>(STORAGE_KEYS.ACTIVITIES, INITIAL_ACTIVITIES);
       setLocalItem(STORAGE_KEYS.ACTIVITIES, activities.filter((a) => a.id !== id));
       return;
@@ -212,7 +223,8 @@ export const dataService = {
   // INSTANCES SUIVI CUMULÉ
   // ==========================================
   async toggleInstance(activityId: string, instanceCode: string): Promise<ActivityInstance[] | null> {
-    if (!isSupabaseConfigured) {
+    const { data: user } = isSupabaseConfigured ? await supabase.auth.getUser() : { data: { user: null } };
+    if (!isSupabaseConfigured || !user?.user) {
       const activities = getLocalItem<Activity[]>(STORAGE_KEYS.ACTIVITIES, INITIAL_ACTIVITIES);
       const activity = activities.find((a) => a.id === activityId);
       if (!activity) return null;
@@ -273,7 +285,8 @@ export const dataService = {
   // NOTE STRUCTURÉE
   // ==========================================
   async saveNote(activityId: string, noteData: Partial<StructuredNote>): Promise<StructuredNote> {
-    if (!isSupabaseConfigured) {
+    const { data: user } = isSupabaseConfigured ? await supabase.auth.getUser() : { data: { user: null } };
+    if (!isSupabaseConfigured || !user?.user) {
       const activities = getLocalItem<Activity[]>(STORAGE_KEYS.ACTIVITIES, INITIAL_ACTIVITIES);
       const act = activities.find((a) => a.id === activityId);
       if (!act) throw new Error('Activité introuvable');
