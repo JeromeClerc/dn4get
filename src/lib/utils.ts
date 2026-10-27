@@ -102,47 +102,12 @@ export const INSTANCE_DEFINITIONS: InstanceDefinition[] = [
   { code: 'PROD', name: 'PROD', color: '#e11d48', order_index: 9 },
 ];
 
-export const CODE_MAP: Record<string, string> = {
-  dev: 'DEV',
-  developpement: 'DEV',
-  DEV: 'DEV',
-  test: 'TEST',
-  TEST: 'TEST',
-  qa: 'QA',
-  qualite: 'QA',
-  QA: 'QA',
-  integration: 'INT',
-  int: 'INT',
-  INT: 'INT',
-  recette: 'REC',
-  rec: 'REC',
-  REC: 'REC',
-  form: 'FORM',
-  formation: 'FORM',
-  FORM: 'FORM',
-  equinoxe: 'EQNX',
-  eqnx: 'EQNX',
-  EQNX: 'EQNX',
-  'pre-prod': 'PPROD',
-  pprod: 'PPROD',
-  PPROD: 'PPROD',
-  prod: 'PROD',
-  PROD: 'PROD',
-};
-
-export function normalizeInstanceCode(raw: string): string {
-  if (!raw) return '';
-  const clean = raw.trim();
-  return CODE_MAP[clean.toLowerCase()] || CODE_MAP[clean] || clean.toUpperCase();
-}
-
-export function getInstanceInfo(rawCodeOrName: string): InstanceDefinition {
-  const normalized = normalizeInstanceCode(rawCodeOrName);
-  const found = INSTANCE_DEFINITIONS.find((i) => i.code === normalized);
+export function getInstanceInfo(code: string): InstanceDefinition {
+  const found = INSTANCE_DEFINITIONS.find((i) => i.code === code);
   if (found) return found;
   return {
-    code: normalized,
-    name: normalized,
+    code,
+    name: code,
     color: '#64748b',
     order_index: 99,
   };

@@ -1,7 +1,7 @@
 import { supabase, isSupabaseConfigured } from '../lib/supabaseClient';
 import { Activity, ActivityInstance, Client, DatabaseInstance, NotificationItem, StructuredNote } from '../types';
 import { INITIAL_ACTIVITIES, INITIAL_CLIENTS, INITIAL_INSTANCES, INITIAL_NOTIFICATIONS } from './mockData';
-import { getDefaultNote, normalizeInstanceCode } from '../lib/utils';
+import { getDefaultNote } from '../lib/utils';
 
 const STORAGE_KEYS = {
   ACTIVITIES: 'dn4get_activities_v1',
@@ -87,21 +87,11 @@ export const dataService = {
   // ==========================================
   async getInstances(): Promise<DatabaseInstance[]> {
     if (!isSupabaseConfigured) {
-      const stored = getLocalItem<DatabaseInstance[]>(STORAGE_KEYS.INSTANCES, INITIAL_INSTANCES);
-      // Synchroniser avec les nouvelles instances si nécessaire
-      const hasEqnx = stored.some((i) => i.code === 'EQNX' || i.name === 'EQNX');
-      if (!hasEqnx || stored.length < INITIAL_INSTANCES.length) {
-        setLocalItem(STORAGE_KEYS.INSTANCES, INITIAL_INSTANCES);
-        return INITIAL_INSTANCES;
-      }
-      return stored;
+      return getLocalItem<DatabaseInstance[]>(STORAGE_KEYS.INSTANCES, INITIAL_INSTANCES);
     }
     const { data, error } = await supabase.from('instances').select('*').order('order_index');
     if (error) throw error;
-    if (!data || data.length === 0) {
-      return INITIAL_INSTANCES;
-    }
-    return data;
+    return (data && data.length > 0) ? data : INITIAL_INSTANCES;
   },
 
   // ==========================================
@@ -222,15 +212,13 @@ export const dataService = {
   // INSTANCES SUIVI CUMULÉ
   // ==========================================
   async toggleInstance(activityId: string, instanceCode: string): Promise<ActivityInstance[] | null> {
-    const canonCode = normalizeInstanceCode(instanceCode);
-
     if (!isSupabaseConfigured) {
       const activities = getLocalItem<Activity[]>(STORAGE_KEYS.ACTIVITIES, INITIAL_ACTIVITIES);
       const activity = activities.find((a) => a.id === activityId);
       if (!activity) return null;
 
       const instances = activity.instances || [];
-      const existsIndex = instances.findIndex((i) => normalizeInstanceCode(i.instance_name) === canonCode);
+      const existsIndex = instances.findIndex((i) => i.instance_name === instanceCode);
 
       if (existsIndex >= 0) {
         // Supprimer l'instance
@@ -240,7 +228,7 @@ export const dataService = {
         instances.push({
           id: 'ai-' + Date.now(),
           activity_id: activityId,
-          instance_name: canonCode,
+          instance_name: instanceCode,
           completed_at: new Date().toISOString(),
           metadata: { added_by: 'utilisateur' },
         });
@@ -253,12 +241,12 @@ export const dataService = {
     }
 
     // Supabase
-    const { data: existingList } = await supabase
+    const { data: existing } = await supabase
       .from('activity_instances')
-      .select('id, instance_name')
-      .eq('activity_id', activityId);
-
-    const existing = existingList?.find((i) => normalizeInstanceCode(i.instance_name) === canonCode);
+      .select('id')
+      .eq('activity_id', activityId)
+      .eq('instance_name', instanceCode)
+      .maybeSingle();
 
     if (existing) {
       await supabase.from('activity_instances').delete().eq('id', existing.id);
@@ -266,7 +254,7 @@ export const dataService = {
       await supabase.from('activity_instances').insert([
         {
           activity_id: activityId,
-          instance_name: canonCode,
+          instance_name: instanceCode,
           completed_at: new Date().toISOString(),
           metadata: { user_agent: navigator.userAgent },
         },

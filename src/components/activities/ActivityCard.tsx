@@ -20,7 +20,6 @@ import {
   formatDateShortFr,
   formatDateTimeFr,
   triggerConfetti,
-  normalizeInstanceCode,
   getInstanceInfo,
 } from '../../lib/utils';
 
@@ -49,14 +48,10 @@ export const ActivityCard: React.FC<ActivityCardProps> = ({
   const dueStatus = getDueDateStatus(activity.due_date);
 
   const completedInstances = activity.instances || [];
-  const completedCodes = new Set(
-    completedInstances.map((i) => normalizeInstanceCode(i.instance_name))
-  );
+  const completedCodes = new Set(completedInstances.map((i) => i.instance_name));
 
   // Instances disponibles à ajouter (non encore assignées)
-  const availableInstances = instances.filter(
-    (inst) => !completedCodes.has(normalizeInstanceCode(inst.code))
-  );
+  const availableInstances = instances.filter((inst) => !completedCodes.has(inst.code));
 
   // Fermer le menu si clic en dehors
   useEffect(() => {

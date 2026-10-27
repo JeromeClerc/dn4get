@@ -26,7 +26,7 @@ import {
   NoteParams,
   StructuredNote,
 } from '../../types';
-import { STATUS_CONFIG, PRIORITY_CONFIG, getDefaultNote, triggerConfetti, normalizeInstanceCode } from '../../lib/utils';
+import { STATUS_CONFIG, PRIORITY_CONFIG, getDefaultNote, triggerConfetti } from '../../lib/utils';
 
 interface ActivityModalProps {
   activity: Activity | null;
@@ -160,7 +160,7 @@ export const ActivityModal: React.FC<ActivityModalProps> = ({
     }
   };
 
-  const completedSet = new Set((activity.instances || []).map((i) => normalizeInstanceCode(i.instance_name)));
+  const completedSet = new Set((activity.instances || []).map((i) => i.instance_name));
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4 animate-in fade-in duration-200">
@@ -452,9 +452,8 @@ export const ActivityModal: React.FC<ActivityModalProps> = ({
 
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                 {instances.map((inst) => {
-                  const canonCode = normalizeInstanceCode(inst.code);
-                  const isDone = completedSet.has(canonCode);
-                  const instData = (activity.instances || []).find((i) => normalizeInstanceCode(i.instance_name) === canonCode);
+                  const isDone = completedSet.has(inst.code);
+                  const instData = (activity.instances || []).find((i) => i.instance_name === inst.code);
 
                   return (
                     <div

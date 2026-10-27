@@ -2,7 +2,6 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
 import { dataService } from '../services/dataService';
 import { Activity, ActivityPriority, ActivityStatus, FilterState, StructuredNote } from '../types';
-import { normalizeInstanceCode } from '../lib/utils';
 
 export function useDn4Get(filters?: FilterState) {
   const queryClient = useQueryClient();
@@ -83,8 +82,7 @@ export function useDn4Get(filters?: FilterState) {
 
     // Filtre instance traitée
     if (filters.instanceFilter) {
-      const target = normalizeInstanceCode(filters.instanceFilter);
-      const hasInstance = act.instances?.some((i) => normalizeInstanceCode(i.instance_name) === target);
+      const hasInstance = act.instances?.some((i) => i.instance_name === filters.instanceFilter);
       if (!hasInstance) return false;
     }
 
