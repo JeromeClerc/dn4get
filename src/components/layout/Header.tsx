@@ -49,7 +49,7 @@ export const Header: React.FC<HeaderProps> = ({
           {/* Logo gauche */}
           <div className="flex items-center gap-3">
             <div className="relative group flex items-center gap-2.5">
-              <div className="w-10 h-10 rounded-xl overflow-hidden shadow-lg shadow-blue-500/20 bg-gradient-to-tr from-blue-600 via-indigo-600 to-cyan-500 flex items-center justify-center p-1.5 transition-transform group-hover:scale-105 duration-200">
+              <div className="w-10 h-10 rounded-xl overflow-hidden shadow-lg shadow-blue-500/20 bg-gradient-to-tr from-blue-600 via-indigo-600 to-cyan-500 flex items-center justify-center transition-transform group-hover:scale-105 duration-200">
                 <img src="/logo.svg" alt="Dn4Get Logo" className="w-full h-full" />
               </div>
               <div className="flex flex-col">
