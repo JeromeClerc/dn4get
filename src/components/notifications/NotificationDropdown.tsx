@@ -1,7 +1,12 @@
-import React from 'react';
-import { Bell, Check, Clock, ExternalLink, X } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Bell, BellRing, Check, Clock, ExternalLink, ShieldAlert, X } from 'lucide-react';
 import { NotificationItem } from '../../types';
 import { formatDateTimeFr } from '../../lib/utils';
+import {
+  getBrowserNotificationPermission,
+  requestBrowserNotificationPermission,
+  showBrowserNotification,
+} from '../../lib/notificationManager';
 
 interface NotificationDropdownProps {
   notifications: NotificationItem[];
@@ -20,9 +25,37 @@ export const NotificationDropdown: React.FC<NotificationDropdownProps> = ({
   onMarkRead,
   onMarkAllRead,
 }) => {
+  const [permission, setPermission] = useState<NotificationPermission | 'unsupported'>(() =>
+    getBrowserNotificationPermission()
+  );
+
+  useEffect(() => {
+    if (isOpen) {
+      setPermission(getBrowserNotificationPermission());
+    }
+  }, [isOpen]);
+
   if (!isOpen) return null;
 
   const unreadCount = notifications.filter((n) => !n.is_read).length;
+
+  const handleRequestPermission = async () => {
+    const res = await requestBrowserNotificationPermission();
+    setPermission(res);
+    if (res === 'granted') {
+      await showBrowserNotification(
+        'Notifications Dn4Get activées',
+        'Vous recevrez désormais une alerte sur votre écran pour vos échéances du jour.'
+      );
+    }
+  };
+
+  const handleTestNotification = async () => {
+    await showBrowserNotification(
+      'Test de notification Dn4Get',
+      "Les alertes d'échéance fonctionnent correctement sur cet appareil !"
+    );
+  };
 
   return (
     <>
@@ -59,6 +92,44 @@ export const NotificationDropdown: React.FC<NotificationDropdownProps> = ({
             </button>
           </div>
         </div>
+
+        {/* Bandeau de permission Notifications Système / Mobile */}
+        {permission === 'default' && (
+          <div className="px-4 py-2.5 bg-blue-50/80 dark:bg-blue-950/40 border-b border-blue-100 dark:border-blue-900/50 flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 text-xs text-blue-800 dark:text-blue-200">
+              <BellRing className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0" />
+              <span>Activer les alertes sur cet appareil ?</span>
+            </div>
+            <button
+              onClick={handleRequestPermission}
+              className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-blue-600 hover:bg-blue-700 text-white shrink-0 transition-colors"
+            >
+              Activer
+            </button>
+          </div>
+        )}
+
+        {permission === 'denied' && (
+          <div className="px-4 py-2 bg-amber-50 dark:bg-amber-950/40 border-b border-amber-100 dark:border-amber-900/50 flex items-center gap-2 text-[11px] text-amber-800 dark:text-amber-300">
+            <ShieldAlert className="w-4 h-4 text-amber-500 shrink-0" />
+            <span>Notifications navigateur bloquées dans les paramètres du site.</span>
+          </div>
+        )}
+
+        {permission === 'granted' && (
+          <div className="px-4 py-2 bg-emerald-50/60 dark:bg-emerald-950/30 border-b border-emerald-100 dark:border-emerald-900/40 flex items-center justify-between text-[11px] text-emerald-700 dark:text-emerald-300">
+            <span className="flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+              Alertes écran & mobile actives
+            </span>
+            <button
+              onClick={handleTestNotification}
+              className="text-blue-600 dark:text-blue-400 hover:underline font-medium"
+            >
+              Tester l'alerte
+            </button>
+          </div>
+        )}
 
         {/* List */}
         <div className="max-h-96 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800">

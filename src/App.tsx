@@ -11,6 +11,7 @@ import { ActivityModal } from './components/activities/ActivityModal';
 import { ClientManagerModal } from './components/clients/ClientManagerModal';
 import { PwaPrompt } from './components/layout/PwaPrompt';
 import { Activity, FilterState } from './types';
+import { getDueDateStatus } from './lib/utils';
 import {
   CheckCircle2,
   AlertCircle,
@@ -19,6 +20,9 @@ import {
   Inbox,
   Activity as ActivityIcon,
   HelpCircle,
+  Bell,
+  X,
+  ExternalLink,
 } from 'lucide-react';
 
 const queryClient = new QueryClient({
@@ -53,6 +57,8 @@ function MainDashboard() {
     clients,
     instances,
     notifications,
+    toastNotifications,
+    dismissToastNotification,
     createActivity,
     updateActivity,
     deleteActivity,
@@ -70,9 +76,8 @@ function MainDashboard() {
   const blockedCount = allActivities.filter((a) => a.status === 'bloque').length;
   const completedCount = allActivities.filter((a) => a.status === 'termine').length;
 
-  const todayStr = new Date().toISOString().substring(0, 10);
   const dueTodayCount = allActivities.filter(
-    (a) => a.due_date && a.due_date.substring(0, 10) === todayStr && a.status !== 'termine'
+    (a) => a.due_date && a.status !== 'termine' && getDueDateStatus(a.due_date).isToday
   ).length;
 
   return (
@@ -257,6 +262,53 @@ function MainDashboard() {
           setTriggerInstallFn(() => triggerFn);
         }}
       />
+
+      {/* Alertes Toasts d'échéance à l'écran */}
+      {toastNotifications.length > 0 && (
+        <div className="fixed bottom-4 right-4 z-50 flex flex-col gap-2 max-w-sm w-full px-4 sm:px-0 pointer-events-none">
+          {toastNotifications.map((toast) => (
+            <div
+              key={toast.id}
+              className="pointer-events-auto bg-white dark:bg-slate-900 border-l-4 border-l-amber-500 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl p-4 flex items-start gap-3 animate-in slide-in-from-right-5 duration-300"
+            >
+              <div className="p-2 rounded-xl bg-amber-100 text-amber-600 dark:bg-amber-950/80 dark:text-amber-400 shrink-0">
+                <Bell className="w-4 h-4 animate-bounce" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-xs font-bold text-slate-900 dark:text-slate-100 truncate">
+                    {toast.title}
+                  </p>
+                  <button
+                    onClick={() => dismissToastNotification(toast.id)}
+                    className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-0.5"
+                    aria-label="Fermer l'alerte"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+                <p className="text-xs text-slate-600 dark:text-slate-300 mt-1 line-clamp-2">
+                  {toast.message}
+                </p>
+                {toast.activity_id && (
+                  <button
+                    onClick={() => {
+                      markNotificationRead(toast.id);
+                      dismissToastNotification(toast.id);
+                      const act = allActivities.find((a) => a.id === toast.activity_id);
+                      if (act) setSelectedActivity(act);
+                    }}
+                    className="mt-2 inline-flex items-center gap-1 text-[11px] font-semibold text-blue-600 dark:text-blue-400 hover:underline"
+                  >
+                    <span>Ouvrir l'activité</span>
+                    <ExternalLink className="w-3 h-3" />
+                  </button>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

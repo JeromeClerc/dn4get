@@ -1,7 +1,7 @@
 import { supabase, isSupabaseConfigured } from '../lib/supabaseClient';
 import { Activity, ActivityInstance, Client, DatabaseInstance, NotificationItem, StructuredNote } from '../types';
 import { INITIAL_ACTIVITIES, INITIAL_CLIENTS, INITIAL_INSTANCES, INITIAL_NOTIFICATIONS } from './mockData';
-import { getDefaultNote } from '../lib/utils';
+import { formatDateShortFr, getDefaultNote, getDueDateStatus } from '../lib/utils';
 
 const STORAGE_KEYS = {
   ACTIVITIES: 'dn4get_activities_v1',
@@ -151,6 +151,7 @@ export const dataService = {
         attachments: [],
       };
       setLocalItem(STORAGE_KEYS.ACTIVITIES, [newActivity, ...activities]);
+      await this.evaluateActivityDueNotification(newActivity, true);
       return newActivity;
     }
 
@@ -170,6 +171,7 @@ export const dataService = {
       .single();
 
     if (error) throw error;
+    await this.evaluateActivityDueNotification(data, true);
     return data;
   },
 
@@ -179,6 +181,7 @@ export const dataService = {
       const activities = getLocalItem<Activity[]>(STORAGE_KEYS.ACTIVITIES, INITIAL_ACTIVITIES);
       const index = activities.findIndex((a) => a.id === id);
       if (index === -1) throw new Error('Activité introuvable');
+      const prevDueDate = activities[index].due_date;
       
       const updated: Activity = {
         ...activities[index],
@@ -187,8 +190,15 @@ export const dataService = {
       };
       activities[index] = updated;
       setLocalItem(STORAGE_KEYS.ACTIVITIES, [...activities]);
+      await this.evaluateActivityDueNotification(updated, false, prevDueDate);
       return updated;
     }
+
+    const { data: existingAct } = await supabase
+      .from('activities')
+      .select('due_date')
+      .eq('id', id)
+      .maybeSingle();
 
     const { data, error } = await supabase
       .from('activities')
@@ -205,6 +215,7 @@ export const dataService = {
       .single();
 
     if (error) throw error;
+    await this.evaluateActivityDueNotification(data, false, existingAct?.due_date);
     return data;
   },
 
@@ -333,6 +344,10 @@ export const dataService = {
     if (!isSupabaseConfigured) {
       return getLocalItem<NotificationItem[]>(STORAGE_KEYS.NOTIFICATIONS, INITIAL_NOTIFICATIONS);
     }
+    const { data: user } = await supabase.auth.getUser();
+    if (!user?.user) {
+      return getLocalItem<NotificationItem[]>(STORAGE_KEYS.NOTIFICATIONS, INITIAL_NOTIFICATIONS);
+    }
     const { data, error } = await supabase
       .from('notifications')
       .select('*')
@@ -341,8 +356,179 @@ export const dataService = {
     return data || [];
   },
 
+  async createNotification(payload: {
+    activity_id?: string;
+    type: NotificationItem['type'];
+    title: string;
+    message: string;
+  }): Promise<NotificationItem | null> {
+    const { data: user } = isSupabaseConfigured ? await supabase.auth.getUser() : { data: { user: null } };
+    if (!isSupabaseConfigured || !user?.user) {
+      const notifs = getLocalItem<NotificationItem[]>(STORAGE_KEYS.NOTIFICATIONS, INITIAL_NOTIFICATIONS);
+      const newNotif: NotificationItem = {
+        id: 'notif-' + Date.now() + '-' + Math.random().toString(36).substring(2, 6),
+        user_id: user?.user?.id || 'user-default',
+        activity_id: payload.activity_id,
+        type: payload.type,
+        title: payload.title,
+        message: payload.message,
+        is_read: false,
+        created_at: new Date().toISOString(),
+      };
+      setLocalItem(STORAGE_KEYS.NOTIFICATIONS, [newNotif, ...notifs]);
+      return newNotif;
+    }
+
+    const { data, error } = await supabase
+      .from('notifications')
+      .insert([
+        {
+          user_id: user.user.id,
+          activity_id: payload.activity_id || null,
+          type: payload.type,
+          title: payload.title,
+          message: payload.message,
+          is_read: false,
+        },
+      ])
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Erreur création notification:', error);
+      return null;
+    }
+    return data;
+  },
+
+  async evaluateActivityDueNotification(
+    activity: Activity,
+    isNew: boolean,
+    previousDueDate?: string | null
+  ): Promise<void> {
+    if (!activity.due_date || activity.status === 'termine') return;
+
+    const dueStatus = getDueDateStatus(activity.due_date);
+    const dueChanged = !isNew && previousDueDate !== activity.due_date;
+
+    let title = '';
+    let message = '';
+
+    if (dueStatus.isToday) {
+      title = "Échéance aujourd'hui";
+      message = `L'activité "${activity.title}" arrive à échéance aujourd'hui.`;
+    } else if (dueStatus.isOverdue) {
+      title = 'Échéance dépassée';
+      message = `L'activité "${activity.title}" est en retard (${dueStatus.text.toLowerCase()}).`;
+    } else if (dueStatus.isTomorrow) {
+      title = 'Échéance demain';
+      message = `L'activité "${activity.title}" arrive à échéance demain.`;
+    } else if (dueChanged) {
+      title = "Date d'échéance modifiée";
+      message = `L'échéance de "${activity.title}" a été fixée au ${formatDateShortFr(activity.due_date)}.`;
+    } else {
+      return;
+    }
+
+    const existingNotifs = await this.getNotifications();
+    const now = new Date();
+    const isSameDay = (dStr: string) => {
+      const d = new Date(dStr);
+      return (
+        d.getFullYear() === now.getFullYear() &&
+        d.getMonth() === now.getMonth() &&
+        d.getDate() === now.getDate()
+      );
+    };
+
+    const alreadyExists = existingNotifs.some(
+      (n) =>
+        n.activity_id === activity.id &&
+        n.type === 'due_date' &&
+        n.title === title &&
+        (isSameDay(n.created_at) || !n.is_read)
+    );
+
+    if (!alreadyExists && (!dueChanged || !alreadyExists)) {
+      await this.createNotification({
+        activity_id: activity.id,
+        type: 'due_date',
+        title,
+        message,
+      });
+    }
+  },
+
+  async syncDueNotifications(activities: Activity[]): Promise<boolean> {
+    if (!activities || activities.length === 0) return false;
+
+    const existingNotifs = await this.getNotifications();
+    const now = new Date();
+    const isSameDay = (dStr: string) => {
+      const d = new Date(dStr);
+      return (
+        d.getFullYear() === now.getFullYear() &&
+        d.getMonth() === now.getMonth() &&
+        d.getDate() === now.getDate()
+      );
+    };
+
+    let createdAny = false;
+
+    for (const act of activities) {
+      if (!act.due_date || act.status === 'termine') continue;
+
+      const dueStatus = getDueDateStatus(act.due_date);
+      let title = '';
+      let message = '';
+
+      if (dueStatus.isToday) {
+        title = "Échéance aujourd'hui";
+        message = `L'activité "${act.title}" arrive à échéance aujourd'hui.`;
+      } else if (dueStatus.isOverdue) {
+        title = 'Échéance dépassée';
+        message = `L'activité "${act.title}" est en retard (${dueStatus.text.toLowerCase()}).`;
+      } else if (dueStatus.isTomorrow) {
+        title = 'Échéance demain';
+        message = `L'activité "${act.title}" arrive à échéance demain.`;
+      } else {
+        continue;
+      }
+
+      const alreadyNotifiedToday = existingNotifs.some(
+        (n) =>
+          n.activity_id === act.id &&
+          n.type === 'due_date' &&
+          n.title === title &&
+          (isSameDay(n.created_at) || !n.is_read)
+      );
+
+      if (!alreadyNotifiedToday) {
+        const created = await this.createNotification({
+          activity_id: act.id,
+          type: 'due_date',
+          title,
+          message,
+        });
+        if (created) {
+          createdAny = true;
+          existingNotifs.unshift(created);
+        }
+      }
+    }
+
+    return createdAny;
+  },
+
   async markNotificationAsRead(id: string): Promise<void> {
     if (!isSupabaseConfigured) {
+      const notifs = getLocalItem<NotificationItem[]>(STORAGE_KEYS.NOTIFICATIONS, INITIAL_NOTIFICATIONS);
+      const updated = notifs.map((n) => (n.id === id ? { ...n, is_read: true } : n));
+      setLocalItem(STORAGE_KEYS.NOTIFICATIONS, updated);
+      return;
+    }
+    const { data: user } = await supabase.auth.getUser();
+    if (!user?.user) {
       const notifs = getLocalItem<NotificationItem[]>(STORAGE_KEYS.NOTIFICATIONS, INITIAL_NOTIFICATIONS);
       const updated = notifs.map((n) => (n.id === id ? { ...n, is_read: true } : n));
       setLocalItem(STORAGE_KEYS.NOTIFICATIONS, updated);
@@ -361,9 +547,15 @@ export const dataService = {
       return;
     }
     const { data: user } = await supabase.auth.getUser();
-    if (user?.user) {
-      await supabase.from('notifications').update({ is_read: true }).eq('user_id', user.user.id);
+    if (!user?.user) {
+      const notifs = getLocalItem<NotificationItem[]>(STORAGE_KEYS.NOTIFICATIONS, INITIAL_NOTIFICATIONS);
+      setLocalItem(
+        STORAGE_KEYS.NOTIFICATIONS,
+        notifs.map((n) => ({ ...n, is_read: true }))
+      );
+      return;
     }
+    await supabase.from('notifications').update({ is_read: true }).eq('user_id', user.user.id);
   },
 
   // ==========================================

@@ -32,7 +32,7 @@ export const QuickAddBar: React.FC<QuickAddBarProps> = ({ clients, onAddActivity
         client_id: clientId || (clients.length > 0 ? clients[0].id : null),
         priority,
         status: 'ouvert',
-        due_date: dueDate ? new Date(dueDate).toISOString() : null,
+        due_date: dueDate ? new Date(`${dueDate}T18:00:00`).toISOString() : null,
       });
 
       // Réinitialiser

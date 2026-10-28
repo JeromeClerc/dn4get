@@ -1,10 +1,16 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useEffect } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { dataService } from '../services/dataService';
-import { Activity, ActivityPriority, ActivityStatus, FilterState, StructuredNote } from '../types';
+import { triggerAlertForNewNotifications } from '../lib/notificationManager';
+import { Activity, ActivityPriority, ActivityStatus, FilterState, NotificationItem, StructuredNote } from '../types';
 
 export function useDn4Get(filters?: FilterState) {
   const queryClient = useQueryClient();
+  const [toastNotifications, setToastNotifications] = useState<NotificationItem[]>([]);
+
+  const dismissToastNotification = useCallback((id: string) => {
+    setToastNotifications((prev) => prev.filter((n) => n.id !== id));
+  }, []);
 
   // Écouteur de modifications temps réel (Supabase ou LocalStorage)
   useEffect(() => {
@@ -38,6 +44,38 @@ export function useDn4Get(filters?: FilterState) {
     queryKey: ['notifications'],
     queryFn: () => dataService.getNotifications(),
   });
+
+  // Synchronisation automatique des notifications d'échéance (aujourd'hui, demain, en retard)
+  useEffect(() => {
+    if (!activitiesQuery.data || activitiesQuery.data.length === 0) return;
+
+    let isMounted = true;
+    const checkDue = async () => {
+      const created = await dataService.syncDueNotifications(activitiesQuery.data || []);
+      if (created && isMounted) {
+        queryClient.invalidateQueries({ queryKey: ['notifications'] });
+      }
+    };
+
+    checkDue();
+    const interval = setInterval(checkDue, 1000 * 60 * 5); // Vérification toutes les 5 minutes
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, [activitiesQuery.data, queryClient]);
+
+  // Déclenchement des alertes navigateur / mobile et des toasts à l'écran
+  useEffect(() => {
+    if (!notificationsQuery.data || notificationsQuery.data.length === 0) return;
+
+    triggerAlertForNewNotifications(notificationsQuery.data, (newNotif) => {
+      setToastNotifications((prev) => {
+        if (prev.some((n) => n.id === newNotif.id)) return prev;
+        return [newNotif, ...prev].slice(0, 4);
+      });
+    });
+  }, [notificationsQuery.data]);
 
   // Filtrage et tri côté client des activités
   const filteredActivities = (activitiesQuery.data || []).filter((act) => {
@@ -125,6 +163,7 @@ export function useDn4Get(filters?: FilterState) {
     }) => dataService.createActivity(payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['activities'] });
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
     },
   });
 
@@ -133,6 +172,7 @@ export function useDn4Get(filters?: FilterState) {
       dataService.updateActivity(id, updates),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['activities'] });
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
     },
   });
 
@@ -140,6 +180,7 @@ export function useDn4Get(filters?: FilterState) {
     mutationFn: (id: string) => dataService.deleteActivity(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['activities'] });
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
     },
   });
 
@@ -205,6 +246,8 @@ export function useDn4Get(filters?: FilterState) {
     clients: clientsQuery.data || [],
     instances: instancesQuery.data || [],
     notifications: notificationsQuery.data || [],
+    toastNotifications,
+    dismissToastNotification,
     unreadNotificationsCount: (notificationsQuery.data || []).filter((n) => !n.is_read).length,
     createActivity: createActivityMutation.mutateAsync,
     updateActivity: updateActivityMutation.mutateAsync,

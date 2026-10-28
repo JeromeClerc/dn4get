@@ -65,15 +65,24 @@ Dn4Get intègre le support des notifications par téléphone portable (numéro m
 3. Renseignez vos identifiants (Account SID, Auth Token, Numéro expéditeur Twilio).
 4. Cette option permet également la connexion sans mot de passe par SMS OTP (code de vérification à 6 chiffres).
 
-### Option 2 : Via Supabase Edge Function dédiée (Notifications WhatsApp & SMS)
-Pour envoyer des alertes proactives de date d'échéance :
-1. Créez un compte [Twilio](https://www.twilio.com/) ou [MessageBird / Bird](https://bird.com/).
-2. Déployez l'Edge Function Supabase `send-due-notification` avec le template fourni dans `supabase/functions/send-due-notification`.
-3. Configurez les secrets dans Supabase via :
-   ```bash
-   supabase secrets set TWILIO_ACCOUNT_SID=... TWILIO_AUTH_TOKEN=... TWILIO_PHONE_NUMBER=...
-   ```
-4. Un cron job ou un trigger pg_cron dans Postgres appellera cette fonction chaque matin pour alerter sur les tâches arrivant à échéance.
+### Option 2 : Via Supabase Triggers, `pg_cron` et Edge Function (`send-due-notification`)
+Pour générer automatiquement les notifications d'échéance dans la base et envoyer des alertes par Email (Resend) ou SMS (Twilio) :
+1. Exécutez la migration SQL `supabase/migrations/003_due_date_notifications.sql` dans le **SQL Editor** de Supabase (crée le trigger temps réel sur `activities` et la fonction quotidienne `generate_daily_due_notifications()`).
+2. Pour la vérification automatique tous les matins : dans Supabase, allez dans **Database** > **Extensions**, activez **`pg_cron`**, puis ré-exécutez le bloc `cron.schedule` de `003_due_date_notifications.sql`.
+3. Pour recevoir en plus des **Emails** (via [Resend](https://resend.com/)) ou **SMS** (via [Twilio](https://www.twilio.com/)) :
+   - Déployez l'Edge Function `supabase/functions/send-due-notification/index.ts` :
+     ```bash
+     supabase functions deploy send-due-notification
+     ```
+   - Configurez vos secrets dans Supabase (**Edge Functions** > **Secrets** ou via CLI) :
+     ```bash
+     supabase secrets set RESEND_API_KEY=re_... NOTIFICATION_FROM_EMAIL="Dn4Get <alertes@votredomaine.com>"
+     supabase secrets set TWILIO_ACCOUNT_SID=... TWILIO_AUTH_TOKEN=... TWILIO_PHONE_NUMBER=...
+     ```
+   - Créez un **Database Webhook** dans Supabase (**Database** > **Webhooks** > **Create a new hook**) :
+     - **Table** : `notifications`
+     - **Events** : `INSERT`
+     - **Type** : `Supabase Edge Functions` -> sélectionnez `send-due-notification`.
 
 ---
 
