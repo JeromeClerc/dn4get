@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   X,
   Save,
@@ -8,11 +8,9 @@ import {
   User,
   Paperclip,
   Plus,
-  Trash,
   UploadCloud,
   FileText,
   Layers,
-  Link,
   Code,
   Shield,
   ExternalLink,
@@ -23,6 +21,8 @@ import {
   Sliders,
   Terminal,
   Hash,
+  MessageSquare,
+  ChevronRight,
 } from 'lucide-react';
 import {
   Activity,
@@ -33,7 +33,13 @@ import {
   NoteParams,
   StructuredNote,
 } from '../../types';
-import { STATUS_CONFIG, PRIORITY_CONFIG, getDefaultNote, triggerConfetti } from '../../lib/utils';
+import {
+  STATUS_CONFIG,
+  PRIORITY_CONFIG,
+  getDefaultNote,
+  normalizeNoteParams,
+  triggerConfetti,
+} from '../../lib/utils';
 
 // Helper pour convertir une valeur texte en tableau de chaînes
 const parseStringToList = (val?: string): string[] => {
@@ -51,7 +57,6 @@ const parseStringToList = (val?: string): string[] => {
 // Sous-composant pour les champs dynamiques avec ajout par Entrée, modification et suppression
 interface DynamicListFieldProps {
   label: string;
-  stepNumber: number;
   icon: React.ReactNode;
   placeholder: string;
   items: string[];
@@ -61,7 +66,6 @@ interface DynamicListFieldProps {
 
 const DynamicListField: React.FC<DynamicListFieldProps> = ({
   label,
-  stepNumber,
   icon,
   placeholder,
   items,
@@ -131,16 +135,11 @@ const DynamicListField: React.FC<DynamicListFieldProps> = ({
 
   return (
     <div className="bg-slate-50 dark:bg-slate-950/60 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-3">
-      {/* En-tête du champ */}
+      {/* En-tête du champ (sans numéro) */}
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <span className="w-5 h-5 rounded-md bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 flex items-center justify-center text-[10px] font-bold">
-            {stepNumber}
-          </span>
-          <div className="flex items-center gap-1.5 text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
-            {icon}
-            <span>{label}</span>
-          </div>
+        <div className="flex items-center gap-1.5 text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
+          {icon}
+          <span>{label}</span>
         </div>
         {items.length > 0 && (
           <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 dark:bg-blue-900/60 text-blue-700 dark:text-blue-300">
@@ -290,13 +289,23 @@ export const ActivityModal: React.FC<ActivityModalProps> = ({
 
   // Note structurée & champs dynamiques
   const initialNote = activity.note || getDefaultNote(activity.id);
-  const [urls, setUrls] = useState<string[]>(initialNote.urls || []);
-  const [newUrl, setNewUrl] = useState('');
+  const [commentaires, setCommentaires] = useState<string>(() => (initialNote.urls || []).join('\n'));
+  const [commentAutoSaveStatus, setCommentAutoSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
   const [usurperList, setUsurperList] = useState<string[]>(() => parseStringToList(initialNote.usurper));
   const [xslLibrariesList, setXslLibrariesList] = useState<string[]>(() => parseStringToList(initialNote.xsl_libraries));
-  const [params, setParams] = useState<NoteParams>(
-    initialNote.params || { portail: '', onglet: '', cellule: '', details: '' }
-  );
+
+  // PARAMS : liste des entrées enregistrées + champs de saisie d'une nouvelle ligne + édition
+  const [paramsList, setParamsList] = useState<NoteParams[]>(() => normalizeNoteParams(initialNote.params));
+  const [newParam, setNewParam] = useState<NoteParams>({ portail: '', onglet: '', cellule: '', details: '' });
+  const [editingParamIdx, setEditingParamIdx] = useState<number | null>(null);
+  const [editingParamData, setEditingParamData] = useState<NoteParams>({
+    portail: '',
+    onglet: '',
+    cellule: '',
+    details: '',
+  });
+  const [isSavingParams, setIsSavingParams] = useState(false);
+
   const [variablesList, setVariablesList] = useState<string[]>(() => parseStringToList(initialNote.variables));
   const [ewxsladmList, setEwxsladmList] = useState<string[]>(() => parseStringToList(initialNote.ewxsladm));
   const [rdoList, setRdoList] = useState<string[]>(() => parseStringToList(initialNote.rdo));
@@ -304,6 +313,8 @@ export const ActivityModal: React.FC<ActivityModalProps> = ({
   const [activeTab, setActiveTab] = useState<'general' | 'note' | 'instances' | 'attachments'>('note');
   const [isSaving, setIsSaving] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+
+  const commentDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     setTitle(activity.title);
@@ -313,18 +324,157 @@ export const ActivityModal: React.FC<ActivityModalProps> = ({
     setDueDate(activity.due_date ? activity.due_date.substring(0, 16) : '');
 
     const note = activity.note || getDefaultNote(activity.id);
-    setUrls(note.urls || []);
+    setCommentaires((note.urls || []).join('\n'));
+    setCommentAutoSaveStatus('idle');
     setUsurperList(parseStringToList(note.usurper));
     setXslLibrariesList(parseStringToList(note.xsl_libraries));
-    setParams(note.params || { portail: '', onglet: '', cellule: '', details: '' });
+    setParamsList(normalizeNoteParams(note.params));
+    setNewParam({ portail: '', onglet: '', cellule: '', details: '' });
+    setEditingParamIdx(null);
     setVariablesList(parseStringToList(note.variables));
     setEwxsladmList(parseStringToList(note.ewxsladm));
     setRdoList(parseStringToList(note.rdo));
-  }, [activity]);
+  }, [activity.id]);
+
+  // Helper centralisé pour sauvegarder la note en base de données
+  const persistNoteToDb = async (overrides?: {
+    commentaires?: string;
+    usurperList?: string[];
+    xslLibrariesList?: string[];
+    paramsList?: NoteParams[];
+    variablesList?: string[];
+    ewxsladmList?: string[];
+    rdoList?: string[];
+  }) => {
+    const nextComments = overrides?.commentaires ?? commentaires;
+    await onSaveNote(activity.id, {
+      urls: nextComments.trim() ? [nextComments] : [],
+      usurper: (overrides?.usurperList ?? usurperList).join('\n'),
+      xsl_libraries: (overrides?.xslLibrariesList ?? xslLibrariesList).join('\n'),
+      params: overrides?.paramsList ?? paramsList,
+      variables: (overrides?.variablesList ?? variablesList).join('\n'),
+      ewxsladm: (overrides?.ewxsladmList ?? ewxsladmList).join('\n'),
+      rdo: (overrides?.rdoList ?? rdoList).join('\n'),
+    });
+  };
+
+  // Gestion des PARAMS (Ajout, Édition, Suppression avec sauvegarde immédiate en base)
+  const hasNewParamInput = Boolean(
+    newParam.portail.trim() ||
+      newParam.onglet.trim() ||
+      newParam.cellule.trim() ||
+      newParam.details.trim()
+  );
+
+  const handleAddParam = async () => {
+    if (!hasNewParamInput) return;
+    const entry: NoteParams = {
+      portail: newParam.portail.trim(),
+      onglet: newParam.onglet.trim(),
+      cellule: newParam.cellule.trim(),
+      details: newParam.details.trim(),
+    };
+    const nextList = [...paramsList, entry];
+    setParamsList(nextList);
+    // Remettre les champs en état de saisir une nouvelle ligne
+    setNewParam({ portail: '', onglet: '', cellule: '', details: '' });
+
+    try {
+      setIsSavingParams(true);
+      await persistNoteToDb({ paramsList: nextList });
+    } catch (e) {
+      console.error('Erreur sauvegarde PARAMS:', e);
+    } finally {
+      setIsSavingParams(false);
+    }
+  };
+
+  const handleStartEditParam = (idx: number) => {
+    setEditingParamIdx(idx);
+    setEditingParamData({ ...paramsList[idx] });
+  };
+
+  const handleSaveEditParam = async (idx: number) => {
+    const updatedEntry: NoteParams = {
+      portail: editingParamData.portail.trim(),
+      onglet: editingParamData.onglet.trim(),
+      cellule: editingParamData.cellule.trim(),
+      details: editingParamData.details.trim(),
+    };
+    const nextList = [...paramsList];
+    nextList[idx] = updatedEntry;
+    setParamsList(nextList);
+    setEditingParamIdx(null);
+
+    try {
+      setIsSavingParams(true);
+      await persistNoteToDb({ paramsList: nextList });
+    } catch (e) {
+      console.error('Erreur modification PARAMS:', e);
+    } finally {
+      setIsSavingParams(false);
+    }
+  };
+
+  const handleDeleteParam = async (idx: number) => {
+    const nextList = paramsList.filter((_, i) => i !== idx);
+    setParamsList(nextList);
+    if (editingParamIdx === idx) {
+      setEditingParamIdx(null);
+    } else if (editingParamIdx !== null && editingParamIdx > idx) {
+      setEditingParamIdx(editingParamIdx - 1);
+    }
+
+    try {
+      setIsSavingParams(true);
+      await persistNoteToDb({ paramsList: nextList });
+    } catch (e) {
+      console.error('Erreur suppression PARAMS:', e);
+    } finally {
+      setIsSavingParams(false);
+    }
+  };
+
+  // Enregistrement automatique du champ COMMENTAIRES
+  const handleCommentairesChange = (val: string) => {
+    setCommentaires(val);
+    setCommentAutoSaveStatus('saving');
+
+    if (commentDebounceRef.current) {
+      clearTimeout(commentDebounceRef.current);
+    }
+
+    commentDebounceRef.current = setTimeout(async () => {
+      try {
+        await persistNoteToDb({ commentaires: val });
+        setCommentAutoSaveStatus('saved');
+      } catch (e) {
+        console.error('Erreur auto-save commentaires:', e);
+        setCommentAutoSaveStatus('idle');
+      }
+    }, 700);
+  };
 
   const handleSave = async () => {
     try {
       setIsSaving(true);
+      if (commentDebounceRef.current) {
+        clearTimeout(commentDebounceRef.current);
+      }
+
+      // Si des données PARAMS étaient en cours de saisie dans le formulaire, les inclure
+      const finalParamsList = hasNewParamInput
+        ? [
+            ...paramsList,
+            {
+              portail: newParam.portail.trim(),
+              onglet: newParam.onglet.trim(),
+              cellule: newParam.cellule.trim(),
+              details: newParam.details.trim(),
+            },
+          ]
+        : paramsList;
+
       // 1. Sauvegarder l'activité
       await onSaveActivity(activity.id, {
         title,
@@ -334,15 +484,15 @@ export const ActivityModal: React.FC<ActivityModalProps> = ({
         due_date: dueDate ? new Date(dueDate).toISOString() : null,
       });
 
-      // 2. Sauvegarder la note structurée (listes sérialisées par saut de ligne)
-      await onSaveNote(activity.id, {
-        urls,
-        usurper: usurperList.join('\n'),
-        xsl_libraries: xslLibrariesList.join('\n'),
-        params,
-        variables: variablesList.join('\n'),
-        ewxsladm: ewxsladmList.join('\n'),
-        rdo: rdoList.join('\n'),
+      // 2. Sauvegarder la note structurée complète
+      await persistNoteToDb({
+        commentaires,
+        usurperList,
+        xslLibrariesList,
+        paramsList: finalParamsList,
+        variablesList,
+        ewxsladmList,
+        rdoList,
       });
 
       if (status === 'termine' && activity.status !== 'termine') {
@@ -356,16 +506,6 @@ export const ActivityModal: React.FC<ActivityModalProps> = ({
     } finally {
       setIsSaving(false);
     }
-  };
-
-  const handleAddUrl = () => {
-    if (!newUrl.trim()) return;
-    setUrls([...urls, newUrl.trim()]);
-    setNewUrl('');
-  };
-
-  const handleRemoveUrl = (index: number) => {
-    setUrls(urls.filter((_, i) => i !== index));
   };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -471,55 +611,63 @@ export const ActivityModal: React.FC<ActivityModalProps> = ({
         {/* Corps du Modal selon l'onglet actif */}
         <div className="p-5 flex-1 overflow-y-auto space-y-4">
           {/* ========================================================= */}
-          {/* ONGLET 1 : NOTES (Ordonnancement précis 1 à 7)            */}
+          {/* ONGLET 1 : NOTES                                          */}
           {/* ========================================================= */}
           {activeTab === 'note' && (
             <div className="space-y-4">
-              {/* Ligne 1 : 1. Usurper & 2. Librairies XSL */}
+              {/* Ligne 1 : Usurper & Librairies XSL */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* 1. Usurper */}
+                {/* Usurper */}
                 <DynamicListField
-                  stepNumber={1}
                   label="Usurper"
                   icon={<UserCheck className="w-3.5 h-3.5 text-purple-500" />}
-                  placeholder="Ex: admin_sys_bcv ou med_super_user"
+                  placeholder="Ex : jclerc."
                   items={usurperList}
                   onChange={setUsurperList}
                   helperText="Tapez un compte à usurper puis appuyez sur Entrée"
                 />
 
-                {/* 2. Librairies XSL */}
+                {/* Librairies XSL */}
                 <DynamicListField
-                  stepNumber={2}
                   label="Librairies XSL"
                   icon={<FileCode className="w-3.5 h-3.5 text-indigo-500" />}
-                  placeholder="Ex: lib-core-transform-v3.xsl"
+                  placeholder="Ex : STYLE.MERGE_PORTAIL_STANDARD."
                   items={xslLibrariesList}
                   onChange={setXslLibrariesList}
                   helperText="Tapez une feuille XSL puis appuyez sur Entrée"
                 />
               </div>
 
-              {/* 3. Bloc PARAMS (Portail > Onglet > Cellule > Détails) */}
+              {/* Bloc PARAMS (Portail > Onglet > Cellule > Détails) */}
               <div className="bg-slate-50 dark:bg-slate-950/60 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-3">
-                <div className="flex items-center gap-2">
-                  <span className="w-5 h-5 rounded-md bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 flex items-center justify-center text-[10px] font-bold">
-                    3
-                  </span>
+                <div className="flex items-center justify-between">
                   <div className="flex items-center gap-1.5 text-xs font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider">
                     <Code className="w-3.5 h-3.5" />
                     <span>PARAMS (Portail &gt; Onglet &gt; Cellule &gt; Détails)</span>
                   </div>
+                  <div className="flex items-center gap-2">
+                    {isSavingParams && (
+                      <span className="text-[10px] text-slate-400 animate-pulse">
+                        Enregistrement...
+                      </span>
+                    )}
+                    {paramsList.length > 0 && (
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 dark:bg-blue-900/60 text-blue-700 dark:text-blue-300">
+                        {paramsList.length} {paramsList.length > 1 ? 'lignes' : 'ligne'}
+                      </span>
+                    )}
+                  </div>
                 </div>
 
+                {/* Champs de saisie d'une nouvelle ligne PARAMS */}
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div>
                     <label className="block text-[11px] font-medium text-slate-500 mb-1">Portail</label>
                     <input
                       type="text"
-                      value={params.portail}
-                      onChange={(e) => setParams({ ...params, portail: e.target.value })}
-                      placeholder="Ex: E-Banking"
+                      value={newParam.portail}
+                      onChange={(e) => setNewParam({ ...newParam, portail: e.target.value })}
+                      placeholder="Ex : PORTAL3S."
                       className="w-full px-3 py-1.5 rounded-xl text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
                     />
                   </div>
@@ -527,9 +675,9 @@ export const ActivityModal: React.FC<ActivityModalProps> = ({
                     <label className="block text-[11px] font-medium text-slate-500 mb-1">Onglet</label>
                     <input
                       type="text"
-                      value={params.onglet}
-                      onChange={(e) => setParams({ ...params, onglet: e.target.value })}
-                      placeholder="Ex: Paramétrage Flux"
+                      value={newParam.onglet}
+                      onChange={(e) => setNewParam({ ...newParam, onglet: e.target.value })}
+                      placeholder="Ex : Dossier élèves."
                       className="w-full px-3 py-1.5 rounded-xl text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
                     />
                   </div>
@@ -537,9 +685,9 @@ export const ActivityModal: React.FC<ActivityModalProps> = ({
                     <label className="block text-[11px] font-medium text-slate-500 mb-1">Cellule</label>
                     <input
                       type="text"
-                      value={params.cellule}
-                      onChange={(e) => setParams({ ...params, cellule: e.target.value })}
-                      placeholder="Ex: Cellule 4B"
+                      value={newParam.cellule}
+                      onChange={(e) => setNewParam({ ...newParam, cellule: e.target.value })}
+                      placeholder="Ex : Cell_Lorem_Ipsum."
                       className="w-full px-3 py-1.5 rounded-xl text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
                     />
                   </div>
@@ -551,123 +699,244 @@ export const ActivityModal: React.FC<ActivityModalProps> = ({
                   </label>
                   <textarea
                     rows={3}
-                    value={params.details}
-                    onChange={(e) => setParams({ ...params, details: e.target.value })}
+                    value={newParam.details}
+                    onChange={(e) => setNewParam({ ...newParam, details: e.target.value })}
                     placeholder="Instructions détaillées, sélecteurs, comportement attendu..."
                     className="w-full px-3 py-2 rounded-xl text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 font-mono text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
                   />
                 </div>
+
+                {/* Bouton Ajouter sous le textarea */}
+                <div className="flex justify-end">
+                  <button
+                    type="button"
+                    onClick={handleAddParam}
+                    disabled={!hasNewParamInput || isSavingParams}
+                    className="px-4 py-2 rounded-xl text-xs font-semibold bg-blue-600 hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed text-white flex items-center gap-1.5 transition-all shadow-sm active:scale-95"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Ajouter</span>
+                  </button>
+                </div>
+
+                {/* Liste des lignes PARAMS enregistrées en dessous du bouton Ajouter */}
+                {paramsList.length > 0 && (
+                  <div className="pt-2 border-t border-slate-200/70 dark:border-slate-800 space-y-2 animate-in fade-in duration-200">
+                    {paramsList.map((item, idx) => (
+                      <div
+                        key={idx}
+                        className="p-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 transition-all text-xs"
+                      >
+                        {editingParamIdx === idx ? (
+                          <div className="space-y-3">
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                              <div>
+                                <label className="block text-[10px] font-medium text-slate-400 mb-0.5">
+                                  Portail
+                                </label>
+                                <input
+                                  type="text"
+                                  value={editingParamData.portail}
+                                  onChange={(e) =>
+                                    setEditingParamData({ ...editingParamData, portail: e.target.value })
+                                  }
+                                  placeholder="Ex : PORTAL3S."
+                                  className="w-full px-2.5 py-1.5 rounded-lg text-xs bg-slate-50 dark:bg-slate-800 border border-blue-500/60 text-slate-900 dark:text-slate-100 focus:outline-none"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-[10px] font-medium text-slate-400 mb-0.5">
+                                  Onglet
+                                </label>
+                                <input
+                                  type="text"
+                                  value={editingParamData.onglet}
+                                  onChange={(e) =>
+                                    setEditingParamData({ ...editingParamData, onglet: e.target.value })
+                                  }
+                                  placeholder="Ex : Dossier élèves."
+                                  className="w-full px-2.5 py-1.5 rounded-lg text-xs bg-slate-50 dark:bg-slate-800 border border-blue-500/60 text-slate-900 dark:text-slate-100 focus:outline-none"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-[10px] font-medium text-slate-400 mb-0.5">
+                                  Cellule
+                                </label>
+                                <input
+                                  type="text"
+                                  value={editingParamData.cellule}
+                                  onChange={(e) =>
+                                    setEditingParamData({ ...editingParamData, cellule: e.target.value })
+                                  }
+                                  placeholder="Ex : Cell_Lorem_Ipsum."
+                                  className="w-full px-2.5 py-1.5 rounded-lg text-xs bg-slate-50 dark:bg-slate-800 border border-blue-500/60 text-slate-900 dark:text-slate-100 focus:outline-none"
+                                />
+                              </div>
+                            </div>
+                            <div>
+                              <label className="block text-[10px] font-medium text-slate-400 mb-0.5">
+                                Détails en texte libre
+                              </label>
+                              <textarea
+                                rows={2}
+                                value={editingParamData.details}
+                                onChange={(e) =>
+                                  setEditingParamData({ ...editingParamData, details: e.target.value })
+                                }
+                                className="w-full px-2.5 py-1.5 rounded-lg text-xs font-mono bg-slate-50 dark:bg-slate-800 border border-blue-500/60 text-slate-900 dark:text-slate-100 focus:outline-none"
+                              />
+                            </div>
+                            <div className="flex items-center justify-end gap-2">
+                              <button
+                                type="button"
+                                onClick={() => setEditingParamIdx(null)}
+                                className="px-2.5 py-1 rounded-lg text-xs font-medium text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                              >
+                                Annuler
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleSaveEditParam(idx)}
+                                className="px-3 py-1 rounded-lg text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white flex items-center gap-1 transition-colors"
+                              >
+                                <Check className="w-3.5 h-3.5" />
+                                <span>Valider</span>
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="flex items-start justify-between gap-3">
+                            <div
+                              className="flex-1 min-w-0 space-y-1.5 cursor-pointer"
+                              onDoubleClick={() => handleStartEditParam(idx)}
+                              title="Double-clic pour modifier"
+                            >
+                              <div className="flex flex-wrap items-center gap-1.5">
+                                <span className="text-[10px] font-mono text-slate-400">#{idx + 1}</span>
+                                {item.portail && (
+                                  <span className="px-2 py-0.5 rounded-md bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 font-semibold border border-blue-200/60 dark:border-blue-800/60">
+                                    Portail : <span className="font-mono">{item.portail}</span>
+                                  </span>
+                                )}
+                                {item.portail && (item.onglet || item.cellule) && (
+                                  <ChevronRight className="w-3 h-3 text-slate-400 shrink-0" />
+                                )}
+                                {item.onglet && (
+                                  <span className="px-2 py-0.5 rounded-md bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 font-semibold border border-indigo-200/60 dark:border-indigo-800/60">
+                                    Onglet : <span className="font-mono">{item.onglet}</span>
+                                  </span>
+                                )}
+                                {item.onglet && item.cellule && (
+                                  <ChevronRight className="w-3 h-3 text-slate-400 shrink-0" />
+                                )}
+                                {item.cellule && (
+                                  <span className="px-2 py-0.5 rounded-md bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 font-semibold border border-purple-200/60 dark:border-purple-800/60">
+                                    Cellule : <span className="font-mono">{item.cellule}</span>
+                                  </span>
+                                )}
+                              </div>
+                              {item.details && (
+                                <p className="text-xs font-mono text-slate-700 dark:text-slate-300 whitespace-pre-wrap bg-slate-50 dark:bg-slate-950/50 px-2.5 py-1.5 rounded-lg border border-slate-100 dark:border-slate-800/80">
+                                  {item.details}
+                                </p>
+                              )}
+                            </div>
+
+                            <div className="flex items-center gap-1 shrink-0">
+                              <button
+                                type="button"
+                                onClick={() => handleStartEditParam(idx)}
+                                className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/50 transition-colors"
+                                title="Modifier cette ligne"
+                              >
+                                <Pencil className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteParam(idx)}
+                                className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/50 transition-colors"
+                                title="Supprimer cette ligne"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
-              {/* Ligne 2 : 4. Variables & 5. Ewxsladm */}
+              {/* Ligne 2 : Variables & Ewxsladm */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* 4. Variables */}
+                {/* Variables */}
                 <DynamicListField
-                  stepNumber={4}
                   label="Variables"
                   icon={<Sliders className="w-3.5 h-3.5 text-amber-500" />}
-                  placeholder="Ex: ENV=INTEGRATION"
+                  placeholder="Ex : NOM_DE_LA_VARIABLE"
                   items={variablesList}
                   onChange={setVariablesList}
-                  helperText="Tapez une variable clé=valeur puis appuyez sur Entrée"
+                  helperText="Tapez une variable puis appuyez sur Entrée"
                 />
 
-                {/* 5. Ewxsladm */}
+                {/* Ewxsladm */}
                 <DynamicListField
-                  stepNumber={5}
                   label="Ewxsladm"
                   icon={<Terminal className="w-3.5 h-3.5 text-emerald-500" />}
-                  placeholder="Ex: EXEC_ADMIN_RELOAD_SCHEMA=1"
+                  placeholder="Ex : Eqnx.Monitor.Lorem.Ipsum."
                   items={ewxsladmList}
                   onChange={setEwxsladmList}
                   helperText="Tapez une commande admin puis appuyez sur Entrée"
                 />
               </div>
 
-              {/* 6. RDO */}
+              {/* RDO */}
               <DynamicListField
-                stepNumber={6}
                 label="RDO"
                 icon={<Hash className="w-3.5 h-3.5 text-rose-500" />}
-                placeholder="Ex: RDO-2026-992-BCV"
+                placeholder="Ex : aaaammjj - initiales - Lorem ipsum"
                 items={rdoList}
                 onChange={setRdoList}
                 helperText="Tapez une référence RDO puis appuyez sur Entrée"
               />
 
-              {/* 7. URLs & Liens utiles */}
+              {/* COMMENTAIRES (anciennement URLs & Liens utiles) */}
               <div className="bg-slate-50 dark:bg-slate-950/60 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-3">
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="w-5 h-5 rounded-md bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 flex items-center justify-center text-[10px] font-bold">
-                      7
-                    </span>
-                    <div className="flex items-center gap-1.5 text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
-                      <Link className="w-3.5 h-3.5 text-blue-500" />
-                      <span>URLs & Liens utiles</span>
-                    </div>
+                  <div className="flex items-center gap-1.5 text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
+                    <MessageSquare className="w-3.5 h-3.5 text-blue-500" />
+                    <span>COMMENTAIRES</span>
                   </div>
-                  {urls.length > 0 && (
-                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 dark:bg-blue-900/60 text-blue-700 dark:text-blue-300">
-                      {urls.length} {urls.length > 1 ? 'liens' : 'lien'}
+                  {commentAutoSaveStatus === 'saving' && (
+                    <span className="text-[11px] text-slate-400 animate-pulse">
+                      Enregistrement auto...
+                    </span>
+                  )}
+                  {commentAutoSaveStatus === 'saved' && (
+                    <span className="text-[11px] text-emerald-600 dark:text-emerald-400 flex items-center gap-1 font-medium">
+                      <Check className="w-3 h-3" />
+                      Enregistré
                     </span>
                   )}
                 </div>
 
-                <div className="flex items-center gap-2">
-                  <input
-                    type="url"
-                    value={newUrl}
-                    onChange={(e) => setNewUrl(e.target.value)}
-                    placeholder="https://..."
-                    className="flex-1 px-3.5 py-2 rounded-xl text-xs sm:text-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 transition-all placeholder:text-slate-400"
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault();
-                        handleAddUrl();
-                      }
-                    }}
-                  />
-                  <button
-                    type="button"
-                    onClick={handleAddUrl}
-                    disabled={!newUrl.trim()}
-                    className="px-3 py-2 rounded-xl text-xs font-semibold bg-blue-600 hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed text-white flex items-center gap-1 transition-all shrink-0 shadow-sm active:scale-95"
-                    title="Ajouter le lien (ou Entrée)"
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                    <span className="hidden sm:inline">Ajouter</span>
-                  </button>
-                </div>
-
-                {urls.length > 0 && (
-                  <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1 animate-in fade-in duration-200">
-                    {urls.map((u, i) => (
-                      <div
-                        key={i}
-                        className="group flex items-center justify-between gap-2 px-3 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 text-xs hover:border-slate-300 dark:hover:border-slate-700 transition-colors"
-                      >
-                        <a
-                          href={u}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="text-blue-600 dark:text-blue-400 hover:underline truncate flex items-center gap-1.5 flex-1 min-w-0"
-                        >
-                          <ExternalLink className="w-3 h-3 shrink-0" />
-                          <span className="truncate">{u}</span>
-                        </a>
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveUrl(i)}
-                          className="text-slate-400 hover:text-rose-500 p-1.5 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-950/50 transition-colors shrink-0"
-                          title="Supprimer ce lien"
-                        >
-                          <Trash className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
+                <textarea
+                  rows={4}
+                  value={commentaires}
+                  onChange={(e) => handleCommentairesChange(e.target.value)}
+                  onBlur={() => {
+                    if (commentDebounceRef.current) {
+                      clearTimeout(commentDebounceRef.current);
+                      commentDebounceRef.current = null;
+                      persistNoteToDb({ commentaires })
+                        .then(() => setCommentAutoSaveStatus('saved'))
+                        .catch(() => setCommentAutoSaveStatus('idle'));
+                    }
+                  }}
+                  placeholder="Saisissez vos commentaires, remarques ou liens utiles..."
+                  className="w-full px-3.5 py-2.5 rounded-xl text-xs sm:text-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/30 transition-all placeholder:text-slate-400"
+                />
               </div>
             </div>
           )}

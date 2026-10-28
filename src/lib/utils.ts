@@ -123,18 +123,31 @@ export function getInstanceInfo(code: string): InstanceDefinition {
 
 export const DEFAULT_INSTANCES = INSTANCE_DEFINITIONS;
 
+export function normalizeNoteParams(params?: NoteParams | NoteParams[] | null): NoteParams[] {
+  if (!params) return [];
+  if (Array.isArray(params)) {
+    return params.filter(
+      (p) => p && (p.portail?.trim() || p.onglet?.trim() || p.cellule?.trim() || p.details?.trim())
+    );
+  }
+  if (
+    params.portail?.trim() ||
+    params.onglet?.trim() ||
+    params.cellule?.trim() ||
+    params.details?.trim()
+  ) {
+    return [params];
+  }
+  return [];
+}
+
 export function getDefaultNote(activityId: string): StructuredNote {
   return {
     activity_id: activityId,
     urls: [],
     usurper: '',
     xsl_libraries: '',
-    params: {
-      portail: '',
-      onglet: '',
-      cellule: '',
-      details: '',
-    },
+    params: [],
     variables: '',
     ewxsladm: '',
     rdo: '',

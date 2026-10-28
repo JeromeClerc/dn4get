@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState, useCallback } from 'react';
 import { dataService } from '../services/dataService';
 import { triggerAlertForNewNotifications } from '../lib/notificationManager';
+import { normalizeNoteParams } from '../lib/utils';
 import { Activity, ActivityPriority, ActivityStatus, FilterState, NotificationItem, StructuredNote } from '../types';
 
 export function useDn4Get(filters?: FilterState) {
@@ -93,12 +94,17 @@ export function useDn4Get(filters?: FilterState) {
       const matchClient = act.client?.name.toLowerCase().includes(q) || act.client?.code?.toLowerCase().includes(q);
       const matchRdo = act.note?.rdo?.toLowerCase().includes(q);
       const matchUsurper = act.note?.usurper?.toLowerCase().includes(q);
-      const matchParams =
-        act.note?.params?.portail?.toLowerCase().includes(q) ||
-        act.note?.params?.cellule?.toLowerCase().includes(q) ||
-        act.note?.params?.details?.toLowerCase().includes(q);
+      const paramsList = normalizeNoteParams(act.note?.params);
+      const matchParams = paramsList.some(
+        (p) =>
+          p.portail?.toLowerCase().includes(q) ||
+          p.onglet?.toLowerCase().includes(q) ||
+          p.cellule?.toLowerCase().includes(q) ||
+          p.details?.toLowerCase().includes(q)
+      );
+      const matchComments = act.note?.urls?.some((u) => u.toLowerCase().includes(q));
 
-      if (!matchTitle && !matchClient && !matchRdo && !matchUsurper && !matchParams) {
+      if (!matchTitle && !matchClient && !matchRdo && !matchUsurper && !matchParams && !matchComments) {
         return false;
       }
     }

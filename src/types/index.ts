@@ -43,7 +43,7 @@ export interface StructuredNote {
   urls: string[];
   usurper: string;
   xsl_libraries: string;
-  params: NoteParams;
+  params: NoteParams | NoteParams[];
   variables: string;
   ewxsladm: string;
   rdo: string;

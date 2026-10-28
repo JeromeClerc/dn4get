@@ -116,7 +116,13 @@ export const dataService = {
       .order('created_at', { ascending: false });
 
     if (error) throw error;
-    return (data && data.length > 0) ? data : getLocalItem<Activity[]>(STORAGE_KEYS.ACTIVITIES, INITIAL_ACTIVITIES);
+    if (data && data.length > 0) {
+      return data.map((row: any) => ({
+        ...row,
+        note: Array.isArray(row.note) ? row.note[0] : row.note,
+      }));
+    }
+    return getLocalItem<Activity[]>(STORAGE_KEYS.ACTIVITIES, INITIAL_ACTIVITIES);
   },
 
   async createActivity(payload: {
@@ -322,7 +328,7 @@ export const dataService = {
           urls: noteData.urls || [],
           usurper: noteData.usurper || '',
           xsl_libraries: noteData.xsl_libraries || '',
-          params: noteData.params || { portail: '', onglet: '', cellule: '', details: '' },
+          params: noteData.params ?? [],
           variables: noteData.variables || '',
           ewxsladm: noteData.ewxsladm || '',
           rdo: noteData.rdo || '',

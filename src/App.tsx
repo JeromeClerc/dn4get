@@ -224,7 +224,11 @@ function MainDashboard() {
 
       {/* Modal d'édition complète */}
       <ActivityModal
-        activity={selectedActivity}
+        activity={
+          selectedActivity
+            ? allActivities.find((a) => a.id === selectedActivity.id) || selectedActivity
+            : null
+        }
         isOpen={Boolean(selectedActivity)}
         onClose={() => setSelectedActivity(null)}
         clients={clients}
